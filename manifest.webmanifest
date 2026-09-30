@@ -1,7 +1,7 @@
 {
-  "name": "Striver A2Z DSA Tracker",
+  "name": "A2Z DSA Tracker",
   "short_name": "A2Z Tracker",
-  "description": "A local-first Striver A2Z DSA progress tracker",
+  "description": "A local-first A2Z DSA progress tracker",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

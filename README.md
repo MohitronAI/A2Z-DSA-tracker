@@ -1,6 +1,6 @@
-# A2Z DSA Progress Tracker
+# A2Z DSA Tracker
 
-A responsive, local-first tracker for Striver’s Take U Forward A2Z DSA roadmap. It organizes the curriculum into 20 modules, 84 sections, and 495 lessons. Lesson titles and direct video links are kept in the static curriculum file.
+A responsive, local-first tracker for Take U Forward’s Striver A2Z DSA roadmap. It organizes the curriculum into 20 modules, 84 sections, and 495 lessons. Lesson titles and direct video links are kept in the static curriculum file.
 
 ## Features
 
