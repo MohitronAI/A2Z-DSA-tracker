@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+.vercel/
+supabase/.temp/
+supabase/.branches/
+Open Tracker.url
+*.log
+.DS_Store
+Thumbs.db

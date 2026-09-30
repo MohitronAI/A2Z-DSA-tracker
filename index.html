@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f6f8fc" />
+  <title>Striver A2Z DSA Progress Tracker</title>
+  <link rel="manifest" href="manifest.webmanifest?v=sync-20260930" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=pair-20261001" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#dashboard" aria-label="Striver A2Z home">
+        <span class="brand-mark">A<span>2</span>Z</span>
+        <span><b>Striver A2Z</b><small>DSA PROGRESS TRACKER</small></span>
+      </a>
+      <div class="nav-label">WORKSPACE</div>
+      <nav class="primary-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-page="dashboard"><span class="nav-icon">◫</span>Dashboard</button>
+        <button class="nav-item" data-page="roadmap"><span class="nav-icon">⌘</span>Roadmap <span class="nav-count">20</span></button>
+        <button class="nav-item" data-page="search"><span class="nav-icon">⌕</span>Search</button>
+        <button class="nav-item" data-page="settings"><span class="nav-icon">⚙</span>Settings</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="local-card"><span class="local-dot"></span><div><b>Saved on this device</b><small>Your progress stays private</small></div></div>
+        <div class="sidebar-foot">A personal learning companion<br><span>Independent from TUF</span></div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar"><div class="breadcrumb">My workspace <span>/</span> <b id="crumb-current">Dashboard</b></div><div class="top-right"><span class="sync-indicator" id="sync-indicator" aria-live="polite">● Saved locally</span><span class="today-label" id="today-label"></span><span class="avatar">S</span></div></header>
+
+      <section class="page active" id="dashboard-page">
+        <div class="welcome-row"><div><div class="eyebrow">YOUR LEARNING, YOUR PACE</div><h1>A2Z DSA Progress</h1><p class="subtitle">A clear view of every lesson you’ve completed so far.</p></div><button class="primary-button" data-go-roadmap>Explore roadmap <span>↗</span></button></div>
+        <div class="hero-card">
+          <div class="hero-copy"><div class="eyebrow light">OVERALL PROGRESS</div><div class="hero-count"><strong id="overall-count">0 / 495</strong><span>lessons completed</span></div><div class="hero-bar"><span id="overall-bar"></span></div><div class="hero-meta"><span id="overall-percent">0% complete</span><span id="remaining-count">495 remaining</span></div></div>
+          <div class="hero-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="art-core">A<span>2</span>Z</div><span class="spark spark-a">✦</span><span class="spark spark-b">✧</span><span class="art-pill">keep going</span></div>
+        </div>
+        <div class="stat-grid">
+          <article class="stat-card"><div class="stat-top"><span class="stat-icon green">✓</span><span class="stat-caption">COMPLETED</span></div><strong id="completed-stat">0</strong><small>Lessons watched</small></article>
+          <article class="stat-card"><div class="stat-top"><span class="stat-icon blue">◷</span><span class="stat-caption">IN PROGRESS</span></div><strong id="in-progress-stat">0</strong><small>Started, not completed</small></article>
+          <article class="stat-card"><div class="stat-top"><span class="stat-icon violet">▦</span><span class="stat-caption">REMAINING</span></div><strong id="remaining-stat">495</strong><small>Ready when you are</small></article>
+          <article class="stat-card"><div class="stat-top"><span class="stat-icon blue">#</span><span class="stat-caption">TOTAL LESSONS</span></div><strong id="total-stat">495</strong><small>Across all modules</small></article>
+          <article class="stat-card activity-stat"><div class="stat-top"><span class="stat-icon amber">↗</span><span class="stat-caption">LAST ACTIVITY</span></div><strong class="activity-title" id="last-activity">No activity yet</strong><small id="last-activity-time">Check off a lesson to get started</small></article>
+        </div>
+        <section class="module-overview"><div class="section-heading"><div><div class="eyebrow">YOUR A2Z JOURNEY</div><h2>Module progress</h2></div><button class="text-button" data-go-roadmap>View roadmap <span>→</span></button></div><div class="module-grid" id="module-overview"></div></section>
+        <div class="data-note"><span>ⓘ</span><div><b>Progress tracks 495 topics across the 20 official A2Z modules.</b> The public TUF sheet provides direct YouTube links for 324 topics; the remaining 171 are marked individually as “Video link unavailable.” These are topic rows, not TUF’s separate 792-video count.</div></div>
+      </section>
+
+      <section class="page" id="settings-page">
+        <div class="welcome-row"><div><div class="eyebrow">YOUR TRACKER, EVERYWHERE</div><h1>Settings</h1><p class="subtitle">Pair a device once. Your progress then syncs automatically and stays available offline.</p></div></div>
+        <section class="sync-card devices-card">
+          <div class="sync-card-heading"><div><div class="eyebrow">DEVICES</div><h2>Your devices</h2><p>Pair your phone or tablet once to keep progress in sync.</p></div><span class="sync-status" id="sync-status">Saved locally</span></div>
+          <div id="device-list" class="device-list"></div>
+          <button class="primary-button" id="connect-device">＋ Connect another device</button>
+          <div id="pairing-panel" class="pairing-panel" hidden>
+            <div><h3>Connect another device</h3><p>Scan this code with your phone’s camera. Pairing expires in 5 minutes and works once.</p></div>
+            <canvas id="pairing-qr" width="240" height="240" aria-label="One-time device pairing QR code"></canvas>
+            <div class="pairing-fallback"><span>Or enter this short one-time code on the other device</span><code id="pairing-code"></code><small id="pairing-expiry"></small></div>
+          </div>
+          <div id="phone-pairing" class="phone-pairing">
+            <h3>Already have a tracker?</h3><p>Scan the QR code shown on your primary device with your phone’s camera. Or enter its one-time pairing code below.</p>
+            <div class="existing-sync-row"><input id="pairing-code-input" type="text" maxlength="14" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" placeholder="12-character pairing code"><button class="secondary-button" id="join-pairing">Connect</button></div>
+          </div>
+          <div class="sync-feedback" id="sync-feedback" role="status" aria-live="polite"></div><small class="last-sync-label" id="last-sync-label"></small>
+        </section>
+        <section class="sync-card storage-card"><div class="eyebrow">STORAGE</div><h2>Available offline</h2><p>Lessons and progress are saved on this device immediately. Changes sync automatically when you’re online.</p></section>
+        <details class="sync-card advanced-card"><summary>Advanced · Backup / Restore</summary><p>Use a private backup file to move or recover progress manually.</p><div class="sync-actions"><button class="secondary-button" id="export-backup">Export Backup</button><button class="secondary-button" id="import-backup">Import Backup</button><input id="backup-file" type="file" accept="application/json,.json" hidden></div></details>
+      </section>
+
+      <section class="page" id="roadmap-page">
+        <div class="roadmap-intro"><div><div class="eyebrow">THE FULL LEARNING PATH</div><h1>A2Z Roadmap</h1><p class="subtitle">Choose any module and move at your own pace. No locks, no schedule.</p></div><div class="roadmap-total"><strong id="roadmap-count">0 / 495</strong><span>lessons completed</span></div></div>
+        <div class="roadmap-tools"><label class="search-box"><span>⌕</span><input id="lesson-search" type="search" placeholder="Search lessons or modules…" autocomplete="off"><kbd>⌘ K</kbd></label><div class="filter-group" role="group" aria-label="Filter lessons"><button class="filter active" data-filter="all">All</button><button class="filter" data-filter="completed">Completed</button><button class="filter" data-filter="incomplete">To do</button></div></div>
+        <div class="search-summary" id="search-summary" hidden></div>
+        <div class="module-list" id="roadmap-list"></div>
+        <div class="roadmap-footnote"><span>ⓘ</span><span>Curriculum titles and section order come from the public TUF A2Z sheet. YouTube buttons link directly to URLs published with those lessons; entries without a verifiable direct video are labelled individually.</span></div>
+      </section>
+      <footer class="page-footer"><span>Made for steady progress, one lesson at a time.</span><span>Progress is stored locally in your browser.</span></footer>
+    </main>
+  </div>
+  <script src="config.js?v=supabase-20260930"></script>
+  <script src="curriculum.js?v=sync-20260930"></script>
+  <script src="src/qr.js?v=pair-20261001"></script>
+  <script src="src/app.js?v=pair-20261001"></script>
+</body>
+</html>
