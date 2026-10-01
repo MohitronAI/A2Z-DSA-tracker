@@ -1,7 +1,7 @@
 {
-  "name": "A2Z DSA Tracker",
-  "short_name": "A2Z Tracker",
-  "description": "A local-first A2Z DSA progress tracker",
+  "name": "MOHIT.OS · A2Z DSA",
+  "short_name": "MOHIT.OS",
+  "description": "Learn · Build · Think — A2Z DSA is the first learning module.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

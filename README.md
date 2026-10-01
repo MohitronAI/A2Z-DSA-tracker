@@ -1,6 +1,8 @@
-# A2Z DSA Tracker
+# MOHIT.OS
 
-A responsive, local-first tracker for Take U Forward’s Striver A2Z DSA roadmap. It organizes the curriculum into 20 modules, 84 sections, and 495 lessons. Lesson titles and direct video links are kept in the static curriculum file.
+Learn · Build · Think
+
+MOHIT.OS is a personal learning and creation space. Its first active area is **LEARN**, with **A2Z DSA** as the current learning module. The module follows Take U Forward’s Striver A2Z DSA curriculum and contains 20 modules, 84 sections, and 495 lessons. Lesson titles and direct video links are kept in the static curriculum file.
 
 ## Features
 
@@ -64,7 +66,7 @@ Deploy the project to receive its HTTPS URL. The build script also accepts the l
 
 1. Open the deployed HTTPS URL in Chrome on Android.
 2. Open Chrome’s menu and choose **Install app** or **Add to Home screen**.
-3. Confirm the installation. Launch **A2Z Tracker** from the home screen.
+3. Confirm the installation. Launch **MOHIT.OS** from the home screen and open **LEARN → A2Z DSA**.
 
 The exact menu label depends on the Android and Chrome version.
 

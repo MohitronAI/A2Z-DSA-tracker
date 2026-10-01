@@ -1,5 +1,5 @@
-const CACHE_NAME = 'striver-a2z-static-v9';
-const ASSETS = ['./', './index.html', './styles.css?v=pair-20261001', './config.js?v=supabase-20260930', './curriculum.js?v=sync-20260930', './src/qr.js?v=pair-20261001', './src/app.js?v=pair-20261001', './manifest.webmanifest?v=brand-20260930', './icons/icon-192.svg', './icons/icon-512.svg', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE_NAME = 'striver-a2z-static-v10';
+const ASSETS = ['./', './index.html', './styles.css?v=mohit-os-20261002', './config.js?v=supabase-20260930', './curriculum.js?v=sync-20260930', './src/qr.js?v=pair-20261001', './src/app.js?v=mohit-os-20261002', './manifest.webmanifest?v=mohit-os-20261002', './icons/icon-192.svg', './icons/icon-512.svg', './icons/icon-192.png', './icons/icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
 });

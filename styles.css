@@ -38,3 +38,22 @@
 @media(max-width:720px){.sync-indicator{font-size:8px;max-width:115px;white-space:normal}.device-row{gap:8px}.device-connected{font-size:8px}.pairing-panel canvas{width:min(220px,75vw);height:min(220px,75vw)}.phone-pairing .existing-sync-row{flex-direction:column}.phone-pairing .existing-sync-row button{align-self:flex-start}}
 .pairing-panel[hidden],.phone-pairing[hidden]{display:none!important}
 @media(max-width:720px){.sidebar{height:58px;min-height:58px;padding:6px 9px}.sidebar>.brand{display:none}.primary-nav{width:100%;margin:0;justify-content:space-around;gap:3px}.nav-item{flex:1;justify-content:center;padding:7px 4px;font-size:9px;gap:4px}.nav-icon{font-size:12px}.nav-count{font-size:8px;padding:1px 3px}}
+
+/* MOHIT.OS → LEARN → A2Z DSA navigation */
+.os-areas{display:flex;gap:5px;margin:0 5px 15px}
+.os-area{min-height:28px;display:flex;align-items:center;gap:5px;padding:0 8px;border:1px solid #e8edf5;border-radius:7px;color:#8290a2;font-size:9px;font-weight:800;letter-spacing:.45px}
+.os-area.active{border-color:#dce6ff;background:#f1f5ff;color:#4167c9}
+.os-area.future{color:#a2adbb}
+.os-area small{padding:2px 4px;border-radius:4px;background:#f1f3f6;color:#9aa5b3;font-size:6px;letter-spacing:.25px}
+.learning-module{display:flex;align-items:center;gap:10px;margin:0 4px 18px;padding:10px;border:1px solid #e6ebf3;border-radius:10px;background:#fff;color:inherit;text-decoration:none}
+.learning-module:hover{border-color:#cbd8f8;background:#fbfcff}
+.module-mark{width:31px;height:31px;flex:none;display:grid;place-items:center;border-radius:8px;background:#edf2ff;color:#466ad0;font-size:10px;font-weight:800}
+.learning-module small,.learning-module b{display:block}
+.learning-module small{margin-bottom:3px;color:#99a3b2;font-size:7px;font-weight:800;letter-spacing:.65px}
+.learning-module b{color:#35465d;font-size:11px}
+.breadcrumb{gap:6px;font-size:10px}
+.breadcrumb>span:nth-child(even){color:#c2cad5}
+.breadcrumb>span:first-child,.breadcrumb>span:nth-child(3){color:#8995a6}
+.breadcrumb>b:not(#crumb-current){color:#435a7c}
+@media(max-width:720px){.sidebar>.os-areas,.sidebar>.learning-module{display:none}.breadcrumb{font-size:9px;gap:4px}.breadcrumb-page-separator,#crumb-current{display:none}}
+@media(max-width:390px){.breadcrumb{font-size:8px}.top-right{gap:8px}}

@@ -401,12 +401,12 @@ async function completePairing(value, viaQr = false) {
   }
 }
 function downloadBackup() {
-  const backup = { app:'A2Z DSA Tracker', schemaVersion:SCHEMA_VERSION, backupId:`${Date.now().toString(36)}-${randomRevision()}`, exportedAt:new Date().toISOString(), progress:sanitizeProgress(state.completed) };
+  const backup = { app:'MOHIT.OS · A2Z DSA', schemaVersion:SCHEMA_VERSION, backupId:`${Date.now().toString(36)}-${randomRevision()}`, exportedAt:new Date().toISOString(), progress:sanitizeProgress(state.completed) };
   const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
   const link = document.createElement('a');
   const objectUrl = URL.createObjectURL(blob);
   link.href = objectUrl;
-  link.download = `a2z-dsa-tracker-progress-${new Date().toISOString().slice(0,10)}.json`;
+  link.download = `mohit-os-a2z-dsa-progress-${new Date().toISOString().slice(0,10)}.json`;
   link.click(); setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   $('#sync-feedback').textContent = 'Backup exported. Keep the file private.';
 }
