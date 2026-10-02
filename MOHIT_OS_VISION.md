@@ -26,23 +26,25 @@ Current hierarchy:
 
 `MOHIT.OS → LEARN → A2Z DSA`
 
-`MOHIT.OS → BUILD → Projects (V0)`
+`MOHIT.OS → BUILD → Projects`
 
-LEARN contains the existing A2Z tracker. BUILD V0 provides local-only project/task tracking and activity history. THINK and the remaining areas are future areas and must remain inactive until implemented.
+`MOHIT.OS → THINK → Notes`
+
+`MOHIT.OS → PLAN → Tasks & reminders`
+
+`MOHIT.OS → ACTIVITY`
+
+LEARN contains the existing A2Z tracker. BUILD, THINK, PLAN, and ACTIVITY provide local-only projects/resources, notes, dated tasks, and shared meaningful-change history. Future AI, voice, notifications, calendar, and cloud sync remain inactive.
 
 ## 3. CURRENT STATE
 
-The current active application is:
-
-**LEARN → A2Z DSA**
-
-It is an existing A2Z DSA tracker with curriculum tracking, lesson completion, progress statistics, local-first storage, Supabase cloud synchronization, device pairing, offline support, and PWA support.
+Active areas are LEARN → A2Z DSA, BUILD → Projects, THINK → Notes, PLAN → Tasks & reminders, and ACTIVITY. A2Z remains the existing tracker with curriculum tracking, lesson completion, progress statistics, local-first storage, optional Supabase synchronization, device pairing, offline support, and PWA support. BUILD/THINK/PLAN/ACTIVITY are local-first modules on the separate versioned Foundation IndexedDB repository.
 
 The existing A2Z DSA functionality must continue working while MOHIT.OS expands.
 
 Do not rebuild the A2Z tracker from scratch or replace working architecture without a specific reason.
 
-The MOHIT.OS Foundation is a separate local IndexedDB repository. BUILD V0 uses it for Projects, Tasks, and project ActivityEvents; A2Z progress has not been migrated or connected to it.
+The Foundation stores Projects, Tasks, Notes, resources, and ActivityEvents. A2Z progress has not been migrated or connected to it. The action service exposes structured operations; it is not an AI interface and does not grant access to arbitrary DOM or database records.
 
 ## 4. Product Direction
 
@@ -59,38 +61,15 @@ Learning management:
 A2Z DSA is the first implementation.
 
 ### BUILD
-Project development tracking:
-- Project name
-- Status
-- Current state
-- Importance
-- Last activity
-- Next action
-- Blockers
-- Stuck points
-- Next review date
-- Project history
+Local project context and task tracking are implemented, including descriptions, resources, current state, Next Action, blockers, optional next review, and project history. Further project capabilities should remain incremental.
 
 The purpose is to prevent projects from being forgotten after a presentation or milestone.
 
 ### THINK
-A place for:
-- Notes
-- Ideas
-- Thoughts
-- Decisions
-- Reflections
-- Quick captures
+Initial local notes with tags, search, archive/restore, and optional project association are implemented. Broader decision, reflection, and knowledge-management features remain future work.
 
 ### PLAN
-A future planning system for:
-- Tasks
-- Priorities
-- Deadlines
-- Calendar
-- Future plans
-- Scheduled work
-- Reminders
+Initial local tasks with status, priority, optional project association, and optional due/reminder date are implemented. Calendar, notifications, and scheduled work remain future work.
 
 ### TRACK
 A future consistency and progress system:
@@ -110,7 +89,7 @@ The future central dashboard should answer:
 It should eventually combine PLAN, BUILD, LEARN, TRACK, ACTIVITY, deadlines, and reminders.
 
 ### REMINDERS
-Reminders should eventually become context-aware.
+Due/reminder dates are currently stored as task metadata only. Reminder delivery should eventually become context-aware.
 
 Instead of only saying:
 > "Work on VisionGuide."
@@ -118,9 +97,7 @@ Instead of only saying:
 They should explain why something matters using relevant project and activity context.
 
 ### ACTIVITY
-ACTIVITY is an important future foundation. It should record what was worked on, when it happened, and where the user stopped.
-
-It should eventually provide historical context for both the dashboard and AI.
+ACTIVITY currently presents meaningful local changes across BUILD, THINK, and PLAN. It should eventually provide richer historical context for the dashboard and AI.
 
 ## 5. Accountability System
 
@@ -239,15 +216,10 @@ Potential areas:
 Existing A2Z DSA functionality remains active.
 
 ### V2 — PLAN
-- Tasks
-- Priorities
-- Calendar
-- Deadlines
-- Future plans
-- Reminders
+Initial local task/reminder-date foundation implemented. Calendar integration, notification delivery, and autonomous reminders remain deferred.
 
 ### V3 — BUILD
-Initial local-only BUILD V0 implemented: project/task tracking and project history. Further BUILD work should remain incremental.
+Initial local-only BUILD V0 and V1 project context/resources implemented. Further BUILD work should remain incremental.
 - Projects
 - Project status
 - Current work
@@ -267,12 +239,7 @@ Expand the existing learning area with:
 - Learning analytics
 
 ### V5 — THINK
-- Notes
-- Ideas
-- Thoughts
-- Decisions
-- Quick capture
-- Personal knowledge
+Initial local notes, tags, archive, project associations, and search implemented. Broader personal knowledge features remain future work.
 
 ### V6 — Intelligence
 Introduce AI across structured MOHIT.OS data.

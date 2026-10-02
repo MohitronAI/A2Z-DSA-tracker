@@ -6,6 +6,7 @@ import {
   ACTIVITY_EVENT_SCHEMA_VERSION,
   FOUNDATION_DATABASE_NAME,
   FOUNDATION_DATABASE_VERSION,
+  NOTE_STORE_NAME,
   PROJECT_STORE_NAME,
   TASK_STORE_NAME,
   buildRepositoryContract,
@@ -13,9 +14,11 @@ import {
   matchesActivityQuery,
   projectTaskRelationshipValid,
   validateProjectRecord,
+  validateNoteRecord,
   validateTaskRecord,
   validateActivityEvent
 } from '../src/foundation/repository.mjs';
+import { actionServiceContract, createMohitOsActions } from '../src/foundation/actions.mjs';
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url));
 const curriculumPath = path.join(rootDir, 'curriculum.js');
@@ -253,7 +256,7 @@ await recordCheck('sync merge contract', () => {
 
 await recordCheck('MOHIT.OS Foundation schema and ActivityEvent contract', () => {
   assert(FOUNDATION_DATABASE_NAME === 'mohit-os-foundation', `Unexpected Foundation database name: ${FOUNDATION_DATABASE_NAME}`);
-  assert(FOUNDATION_DATABASE_VERSION === 2, `Expected Foundation database version 2, found ${FOUNDATION_DATABASE_VERSION}`);
+  assert(FOUNDATION_DATABASE_VERSION === 3, `Expected Foundation database version 3, found ${FOUNDATION_DATABASE_VERSION}`);
   assert(ACTIVITY_EVENT_SCHEMA_VERSION === 1, `Expected ActivityEvent schema version 1, found ${ACTIVITY_EVENT_SCHEMA_VERSION}`);
 
   const event = validateActivityEvent({
@@ -318,9 +321,10 @@ await recordCheck('MOHIT.OS Foundation schema and ActivityEvent contract', () =>
 });
 
 await recordCheck('BUILD V0 record and repository contracts', () => {
-  assert(FOUNDATION_DATABASE_VERSION === 2, `Expected Foundation database version 2, found ${FOUNDATION_DATABASE_VERSION}`);
+  assert(FOUNDATION_DATABASE_VERSION === 3, `Expected Foundation database version 3, found ${FOUNDATION_DATABASE_VERSION}`);
   assert(PROJECT_STORE_NAME === 'projects', `Unexpected Project store: ${PROJECT_STORE_NAME}`);
   assert(TASK_STORE_NAME === 'tasks', `Unexpected Task store: ${TASK_STORE_NAME}`);
+  assert(NOTE_STORE_NAME === 'notes', `Unexpected Note store: ${NOTE_STORE_NAME}`);
   const repository = createFoundationRepository({ indexedDB: null });
   assert(buildRepositoryContract(repository).length === 0, `BUILD repository is missing methods: ${buildRepositoryContract(repository).join(', ')}`);
 
@@ -328,6 +332,14 @@ await recordCheck('BUILD V0 record and repository contracts', () => {
   const project = validateProjectRecord({
     projectId: 'project-check',
     name: 'Validation project',
+    description: 'A structured project validation sample.',
+    resources: [{
+      resourceId: 'resource-check',
+      title: 'Repository',
+      url: 'https://example.com/repo',
+      createdAt: timestamp,
+      updatedAt: timestamp
+    }],
     status: 'active',
     importance: 'high',
     currentState: 'Designing the first step',
@@ -353,11 +365,22 @@ await recordCheck('BUILD V0 record and repository contracts', () => {
   });
   assert(projectTaskRelationshipValid(project, task), 'Next Action relationship should accept an existing task belonging to its project');
   assert(!projectTaskRelationshipValid(project, { ...task, projectId: 'another-project' }), 'Next Action relationship should reject a task from another project');
+  assert(project.resources.length === 1 && project.resources[0].url === 'https://example.com/repo', 'Project resource was not normalized');
 
   const invalidProject = { ...project, status: 'in-progress' };
   let projectRejected = false;
   try { validateProjectRecord(invalidProject); } catch { projectRejected = true; }
   assert(projectRejected, 'Invalid project status should be rejected');
+  let invalidResourceRejected = false;
+  try {
+    validateProjectRecord({ ...project, resources: [{ ...project.resources[0], url: 'javascript:alert(1)' }] });
+  } catch { invalidResourceRejected = true; }
+  assert(invalidResourceRejected, 'Non-HTTP(S) project resources should be rejected');
+  let duplicateResourceRejected = false;
+  try {
+    validateProjectRecord({ ...project, resources: [project.resources[0], { ...project.resources[0], title: 'Duplicate' }] });
+  } catch { duplicateResourceRejected = true; }
+  assert(duplicateResourceRejected, 'Duplicate project resource IDs should be rejected');
 
   const validProjectStatuses = ['active', 'paused', 'completed', 'archived']
     .every(status => validateProjectRecord({ ...project, status }).status === status);
@@ -383,6 +406,92 @@ await recordCheck('BUILD V0 record and repository contracts', () => {
   let completionTimestampRejected = false;
   try { validateTaskRecord({ ...task, status: 'completed' }); } catch { completionTimestampRejected = true; }
   assert(completionTimestampRejected, 'Completed task without completedAt should be rejected');
+
+  const note = validateNoteRecord({
+    noteId: 'note-check',
+    title: 'Validation note',
+    content: 'Keep structured context with a project.',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    projectId: 'project-check',
+    tags: ['idea', ' project ', 'idea'],
+    status: 'active',
+    archivedAt: null
+  });
+  assert(note.tags.length === 2 && note.tags[1] === 'project', 'Note tags should be trimmed and deduplicated');
+  assert(note.projectId === project.projectId, 'Note project reference was not preserved');
+  let invalidNoteRejected = false;
+  try { validateNoteRecord({ ...note, status: 'deleted' }); } catch { invalidNoteRejected = true; }
+  assert(invalidNoteRejected, 'Invalid note status should be rejected');
+  let invalidArchiveRejected = false;
+  try { validateNoteRecord({ ...note, status: 'archived' }); } catch { invalidArchiveRejected = true; }
+  assert(invalidArchiveRejected, 'Archived notes must have archivedAt');
+});
+
+await recordCheck('MOHIT.OS action service contracts', async () => {
+  const calls = [];
+  const fakeRepository = {
+    getProject: async projectId => ({ projectId }),
+    createProject: async input => input,
+    updateProject: async (projectId, changes) => ({ projectId, ...changes }),
+    addProjectResource: async (projectId, input) => ({ projectId, input }),
+    updateProjectResource: async (projectId, resourceId, input) => ({ projectId, resourceId, input }),
+    removeProjectResource: async () => true,
+    createTask: async input => { calls.push(input); return input; },
+    updateTask: async (taskId, changes) => ({ taskId, ...changes }),
+    completeTask: async taskId => ({ taskId, status: 'completed' }),
+    deleteTask: async taskId => ({ taskId }),
+    setProjectNextAction: async (projectId, taskId) => ({ projectId, taskId }),
+    createNote: async input => input,
+    getNote: async noteId => ({ noteId }),
+    listNotes: async () => [],
+    updateNote: async (noteId, changes) => ({ noteId, ...changes }),
+    archiveNote: async noteId => ({ noteId, status: 'archived' }),
+    deleteNote: async noteId => ({ noteId }),
+    listProjects: async () => [{
+      projectId: 'project-search',
+      name: 'VisionGuide',
+      description: 'Scene classifier',
+      currentState: '',
+      blockers: [],
+      resources: [],
+      updatedAt: '2026-10-02T10:00:00.000Z'
+    }],
+    listTasks: async () => [],
+    queryEvents: async options => options
+  };
+  const storageCalls = [];
+  const storage = {
+    getItem: key => {
+      storageCalls.push(['getItem', key]);
+      return JSON.stringify({
+        schemaVersion: 2,
+        completed: { 'lesson-1': { completed: true, completedAt: '2026-10-02T10:00:00.000Z', firstStartedAt: null, lastActivityAt: '2026-10-02T10:00:00.000Z', revisionId: 'rev-1' } },
+        ownerSecret: 'must-not-be-returned'
+      });
+    },
+    setItem: (...args) => storageCalls.push(['setItem', ...args])
+  };
+  const actions = createMohitOsActions(fakeRepository, { storage });
+  assert(actionServiceContract(actions).length === 0, `Missing actions: ${actionServiceContract(actions).join(', ')}`);
+  const reminder = await actions.createReminder({ title: 'Review', remindAt: '2026-10-05T10:00:00.000Z' });
+  assert(reminder.dueAt === '2026-10-05T10:00:00.000Z' && reminder.sourceModule === 'plan.tasks', 'Reminder should map to a due-dated PLAN task');
+  const searchResults = await actions.search('vision');
+  assert(searchResults.length === 1 && searchResults[0].type === 'project', 'Structured cross-entity search should return matching projects');
+  const a2z = await actions.queryA2ZProgress();
+  assert(a2z.schemaVersion === 2 && a2z.progress['lesson-1'].completed, 'A2Z progress query should return sanitized read-only progress');
+  assert(!JSON.stringify(a2z).includes('must-not-be-returned'), 'A2Z query must not expose unrelated localStorage fields');
+  assert(storageCalls.length === 1 && storageCalls[0][0] === 'getItem', 'A2Z action must not write to localStorage');
+});
+
+await recordCheck('MOHIT.OS cross-module dialog IDs', async () => {
+  const [buildSource, osSource] = await Promise.all([
+    fs.readFile(path.join(rootDir, 'src', 'build', 'app.mjs'), 'utf8'),
+    fs.readFile(path.join(rootDir, 'src', 'os', 'app.mjs'), 'utf8')
+  ]);
+  assert(buildSource.includes('id="task-dialog"'), 'BUILD task dialog should retain its module-specific ID');
+  assert(osSource.includes('id="plan-task-dialog"'), 'PLAN task dialog must use a distinct ID from BUILD');
+  assert(!osSource.includes('id="task-dialog"'), 'PLAN must not duplicate the BUILD task dialog ID');
 });
 
 if (failures.length > 0) {

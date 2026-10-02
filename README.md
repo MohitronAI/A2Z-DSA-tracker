@@ -2,7 +2,7 @@
 
 Learn · Build · Think
 
-MOHIT.OS is a personal learning and creation space. Its active areas are **LEARN**, with **A2Z DSA** as the current learning module, and **BUILD · Projects** (V0). The learning module follows Take U Forward’s Striver A2Z DSA curriculum and contains 20 modules, 84 sections, and 495 lessons. Lesson titles and direct video links are kept in the static curriculum file.
+MOHIT.OS is a personal learning and creation space. Its active areas are **LEARN → A2Z DSA**, **BUILD → Projects**, **THINK → Notes**, and **PLAN → Tasks & reminders**. **ACTIVITY** provides a shared local history of meaningful BUILD, THINK, and PLAN changes. The learning module follows Take U Forward’s Striver A2Z DSA curriculum and contains 20 modules, 84 sections, and 495 lessons. Lesson titles and direct video links are kept in the static curriculum file.
 
 ## Features
 
@@ -14,19 +14,27 @@ MOHIT.OS is a personal learning and creation space. Its active areas are **LEARN
 - Install the app as a PWA on Android or desktop. The service worker caches the application shell; streaming YouTube videos still requires internet.
 - Export and import a progress backup from Settings.
 
-BUILD V0 provides a local project and task tracker with a project activity history. It does not sync to Supabase. The roadmap has no day schedule, prerequisite locking, or separate practice-problem tracker. Video links point directly to YouTube; lessons without a verified direct video remain individually marked in the app.
+BUILD provides local project and task tracking, descriptions/current state, optional review dates, and editable project resource links. THINK provides searchable, taggable notes that can be linked to a project, archived, restored, or deleted. PLAN provides project-linked tasks with priority, status, and optional due/reminder date-time; due dates are data only and do not trigger notifications. ACTIVITY shows recent structured changes across these modules. The roadmap has no day schedule, prerequisite locking, or separate practice-problem tracker. Video links point directly to YouTube; lessons without a verified direct video remain individually marked in the app.
 
 ## MOHIT.OS Foundation storage
 
-The app initializes a separate, local-only IndexedDB database named `mohit-os-foundation` (database version 2). The version-1 `activityEvents` store and its data are preserved; version 2 adds `projects`, `tasks`, and `foundationMeta` stores. The ActivityEvent store uses `eventId` as its key and indexes `occurredAt`, `sourceModule`, and the compound subject type/ID. The A2Z tracker does not read from or write to this database.
+The app initializes a separate, local-only IndexedDB database named `mohit-os-foundation` (database version 3). The version-1 `activityEvents` store and version-2 `projects`, `tasks`, and `foundationMeta` stores are preserved. Version 3 adds `notes`, adds a due-date index to tasks, and safely backfills project descriptions/resources. The ActivityEvent store uses `eventId` as its key and indexes `occurredAt`, `sourceModule`, and the compound subject type/ID. The A2Z tracker does not read from or write to this database.
 
-The browser module `src/foundation/repository.mjs` exports `createFoundationRepository()`, which provides `open()`, `appendEvent(event)`, `getEvent(eventId)`, `queryEvents(options)`, and `close()`. `open()` initializes storage and returns database name/version metadata without exposing the raw IndexedDB connection. `appendEvent` is append-only and first-write-wins for duplicate event IDs; query results are ordered by occurrence time, recorded time, then event ID. Storage initialization failures are reported in the console and do not block the existing tracker.
+The browser module `src/foundation/repository.mjs` exports `createFoundationRepository()`, which provides ActivityEvent, project/resource, task, and note repositories. `open()` initializes storage and returns database name/version metadata without exposing the raw IndexedDB connection. `appendEvent` is append-only and first-write-wins for duplicate event IDs; event query results are ordered by occurrence time, recorded time, then event ID. Storage initialization failures are reported in the console and do not block the existing tracker.
 
 Activity events use schema version 1 and record an event ID/type, occurrence and recording timestamps, device ID, source module, a typed subject reference, related entity references, and a JSON payload; `correlationId` is optional. This foundation is not yet connected to A2Z progress, cloud sync, authentication, or notifications.
 
 ## BUILD · Projects
 
-BUILD V0 provides local project and task tracking backed by the Foundation repository. Projects capture status, importance, current state, blockers, one optional next-action task, last activity, and next review date. Tasks can be associated with a project, edited, and completed. Meaningful mutations and task/project creation are recorded in the shared ActivityEvent store and displayed in project history. Nothing is seeded automatically; project/task data remains local to the current browser origin. BUILD has no cloud sync, cross-device sharing, automatic reminders, or A2Z activity adapter.
+Projects capture name, description, status, importance, current state, blockers, one optional next-action task, last activity, optional next review, and multiple validated HTTP(S) resources. Project resources can be added, edited, and removed. Project tasks support status/priority and dates. Meaningful mutations write ActivityEvents and appear in project history.
+
+## THINK · Notes and PLAN · Tasks
+
+Notes store title, content, created/updated times, optional project association, tags, and active/archived state. PLAN reuses the shared Foundation task store rather than introducing a separate calendar or reminder system. Due/reminder dates are stored as task metadata only.
+
+`src/foundation/actions.mjs` exposes a small structured action service for projects, tasks, notes, reminders-as-dated-tasks, search, activity queries, and read-only A2Z progress queries. UI modules use these operations; no AI or chatbot is included.
+
+All BUILD/THINK/PLAN data is local to the browser origin and is not synchronized to Supabase. No notifications, calendar integration, autonomous monitoring, or A2Z activity adapter is implemented.
 
 ## Progress and privacy
 
@@ -86,8 +94,8 @@ The exact menu label depends on the Android and Chrome version.
 
 - `curriculum.js` — static 20-module, 84-section, 495-lesson roadmap and direct video URLs.
 - `src/app.js` and `src/qr.js` — tracker, progress, sync, and pairing UI logic.
-- `src/foundation/` — versioned IndexedDB repository and isolated Foundation bootstrap.
-- `src/build/app.mjs` and `styles-build.css` — local BUILD Projects UI and responsive styling.
+- `src/foundation/` — versioned IndexedDB repository, structured actions, and isolated Foundation bootstrap.
+- `src/build/app.mjs`, `src/os/app.mjs`, and `styles-build.css` — BUILD/THINK/PLAN/ACTIVITY UI and responsive styling.
 - `supabase/migrations/` — progress merge and device pairing schema.
 - `supabase/functions/progress-sync/` — server-side sync and pairing API.
 - `scripts/build.mjs` — environment-based static site build.

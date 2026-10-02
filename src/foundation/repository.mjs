@@ -1,10 +1,11 @@
 export const FOUNDATION_DATABASE_NAME = 'mohit-os-foundation';
-export const FOUNDATION_DATABASE_VERSION = 2;
+export const FOUNDATION_DATABASE_VERSION = 3;
 export const ACTIVITY_STORE_NAME = 'activityEvents';
 export const ACTIVITY_EVENT_SCHEMA_VERSION = 1;
 export const PROJECT_STORE_NAME = 'projects';
 export const TASK_STORE_NAME = 'tasks';
 export const FOUNDATION_META_STORE_NAME = 'foundationMeta';
+export const NOTE_STORE_NAME = 'notes';
 
 const STORE_NAME = ACTIVITY_STORE_NAME;
 const MAX_QUERY_LIMIT = 1000;
@@ -13,7 +14,10 @@ const IMPORTANCE_VALUES = new Set(['low', 'medium', 'high']);
 const TASK_STATUSES = new Set(['todo', 'in_progress', 'completed', 'cancelled']);
 const TASK_PRIORITIES = IMPORTANCE_VALUES;
 const BUILD_SOURCE_MODULE = 'build.projects';
+const THINK_SOURCE_MODULE = 'think.notes';
+const PLAN_SOURCE_MODULE = 'plan.tasks';
 const DEVICE_ID_KEY = 'deviceId';
+const NOTE_STATUSES = new Set(['active', 'archived']);
 
 function isPlainObject(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -57,23 +61,90 @@ export function validateProjectRecord(project) {
     throw new TypeError('Project blockers must be an array of non-empty strings.');
   }
   if (typeof project.currentState !== 'string') throw new TypeError('Project currentState must be a string.');
+  if (project.description !== undefined && typeof project.description !== 'string') {
+    throw new TypeError('Project description must be a string.');
+  }
+  const resources = project.resources === undefined ? [] : project.resources;
+  if (!Array.isArray(resources)) throw new TypeError('Project resources must be an array.');
+  const normalizedResources = resources.map((resource, index) => validateProjectResource(resource, index));
+  if (new Set(normalizedResources.map(resource => resource.resourceId)).size !== normalizedResources.length) {
+    throw new TypeError('Project resource IDs must be unique within the project.');
+  }
   if (project.nextActionId !== null && (typeof project.nextActionId !== 'string' || !project.nextActionId.trim())) {
     throw new TypeError('Project nextActionId must be a non-empty string or null.');
   }
   const normalized = {
     projectId: requireNonEmptyString(project.projectId, 'projectId'),
     name: requireNonEmptyString(project.name, 'name'),
+    description: project.description || '',
     status: project.status,
     importance: project.importance,
     currentState: project.currentState,
     nextActionId: project.nextActionId,
     blockers: project.blockers.map(blocker => blocker.trim()),
+    resources: normalizedResources,
     lastActivityAt: normalizeTimestamp(project.lastActivityAt, 'lastActivityAt'),
     nextReviewAt: nullableTimestamp(project.nextReviewAt, 'nextReviewAt'),
     createdAt: normalizeTimestamp(project.createdAt, 'createdAt'),
     updatedAt: normalizeTimestamp(project.updatedAt, 'updatedAt'),
     archivedAt: nullableTimestamp(project.archivedAt, 'archivedAt')
   };
+  return JSON.parse(JSON.stringify(normalized));
+}
+
+function validateProjectResource(resource, index = 0) {
+  if (!isPlainObject(resource)) throw new TypeError(`Project resource ${index} must be an object.`);
+  const urlText = requireNonEmptyString(resource.url, `resources[${index}].url`);
+  if (urlText.length > 2000) throw new TypeError(`Project resource ${index} URL is too long.`);
+  if (typeof resource.title !== 'string' || !resource.title.trim() || resource.title.length > 160) {
+    throw new TypeError(`Project resource ${index} title must contain 1 to 160 characters.`);
+  }
+  let url;
+  try {
+    url = new URL(urlText);
+  } catch {
+    throw new TypeError(`Project resource ${index} URL must be an absolute HTTP(S) URL.`);
+  }
+  if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password) {
+    throw new TypeError(`Project resource ${index} URL must be an absolute HTTP(S) URL without credentials.`);
+  }
+  return {
+    resourceId: requireNonEmptyString(resource.resourceId, `resources[${index}].resourceId`),
+    title: resource.title.trim(),
+    url: url.href,
+    createdAt: normalizeTimestamp(resource.createdAt, `resources[${index}].createdAt`),
+    updatedAt: normalizeTimestamp(resource.updatedAt, `resources[${index}].updatedAt`)
+  };
+}
+
+export function validateNoteRecord(note) {
+  if (!isPlainObject(note)) throw new TypeError('Note must be a plain object.');
+  if (!NOTE_STATUSES.has(note.status)) throw new TypeError(`Note status is invalid: ${note.status}`);
+  const title = requireNonEmptyString(note.title, 'title');
+  if (typeof note.content !== 'string') throw new TypeError('Note content must be a string.');
+  if (!Array.isArray(note.tags) || note.tags.some(tag => typeof tag !== 'string' || !tag.trim())) {
+    throw new TypeError('Note tags must be an array of non-empty strings.');
+  }
+  if (title.length > 160 || note.content.length > 10000 || note.tags.some(tag => tag.length > 80)) {
+    throw new TypeError('Note title, content, or tags exceed the supported length.');
+  }
+  if (note.projectId !== null && (typeof note.projectId !== 'string' || !note.projectId.trim())) {
+    throw new TypeError('Note projectId must be a non-empty string or null.');
+  }
+  const normalized = {
+    noteId: requireNonEmptyString(note.noteId, 'noteId'),
+    title,
+    content: note.content,
+    createdAt: normalizeTimestamp(note.createdAt, 'createdAt'),
+    updatedAt: normalizeTimestamp(note.updatedAt, 'updatedAt'),
+    projectId: note.projectId,
+    tags: [...new Set(note.tags.map(tag => tag.trim()))],
+    status: note.status,
+    archivedAt: nullableTimestamp(note.archivedAt, 'archivedAt')
+  };
+  if ((normalized.status === 'archived') !== Boolean(normalized.archivedAt)) {
+    throw new TypeError('Note archivedAt must exist exactly when status is archived.');
+  }
   return JSON.parse(JSON.stringify(normalized));
 }
 
@@ -109,8 +180,10 @@ export function projectTaskRelationshipValid(project, task) {
 export function buildRepositoryContract(repository) {
   const requiredMethods = [
     'createProject', 'getProject', 'listProjects', 'updateProject', 'archiveProject',
+    'addProjectResource', 'updateProjectResource', 'removeProjectResource',
     'createTask', 'getTask', 'listTasks', 'updateTask', 'completeTask',
-    'setProjectNextAction', 'queryProjectActivity'
+    'deleteTask', 'setProjectNextAction', 'queryProjectActivity',
+    'createNote', 'getNote', 'listNotes', 'updateNote', 'archiveNote', 'deleteNote'
   ];
   return requiredMethods.filter(method => typeof repository?.[method] !== 'function');
 }
@@ -260,6 +333,25 @@ export function createFoundationRepository({
           tasks.createIndex('byProjectId', 'projectId', { unique: false });
           tasks.createIndex('byStatus', 'status', { unique: false });
         }
+        const tasks = request.transaction.objectStore(TASK_STORE_NAME);
+        if (!tasks.indexNames.contains('byDueAt')) tasks.createIndex('byDueAt', 'dueAt', { unique: false });
+        if (!db.objectStoreNames.contains(NOTE_STORE_NAME)) {
+          const notes = db.createObjectStore(NOTE_STORE_NAME, { keyPath: 'noteId' });
+          notes.createIndex('byProjectId', 'projectId', { unique: false });
+          notes.createIndex('byStatus', 'status', { unique: false });
+          notes.createIndex('byUpdatedAt', 'updatedAt', { unique: false });
+        }
+        const projects = request.transaction.objectStore(PROJECT_STORE_NAME);
+        const projectCursorRequest = projects.openCursor();
+        projectCursorRequest.onsuccess = () => {
+          const cursor = projectCursorRequest.result;
+          if (!cursor) return;
+          const project = cursor.value;
+          if (typeof project.description !== 'string') project.description = '';
+          if (!Array.isArray(project.resources)) project.resources = [];
+          cursor.update(project);
+          cursor.continue();
+        };
         if (!db.objectStoreNames.contains(FOUNDATION_META_STORE_NAME)) {
           db.createObjectStore(FOUNDATION_META_STORE_NAME, { keyPath: 'key' });
         }
@@ -374,7 +466,7 @@ export function createFoundationRepository({
       .slice(0, options.limit);
   }
 
-  function createActivityEvent(deviceId, type, subject, payload, relatedEntities = []) {
+  function createActivityEvent(deviceId, type, subject, payload, relatedEntities = [], sourceModule = BUILD_SOURCE_MODULE) {
     const now = new Date().toISOString();
     return validateActivityEvent({
       eventId: makeId(),
@@ -383,7 +475,7 @@ export function createFoundationRepository({
       occurredAt: now,
       recordedAt: now,
       deviceId,
-      sourceModule: BUILD_SOURCE_MODULE,
+      sourceModule,
       subject,
       relatedEntities,
       payload
@@ -416,11 +508,13 @@ export function createFoundationRepository({
     const project = validateProjectRecord({
       projectId,
       name: input.name,
+      description: input.description ?? '',
       status: input.status || 'active',
       importance: input.importance || 'medium',
       currentState: input.currentState || '',
       nextActionId: null,
       blockers: input.blockers || [],
+      resources: [],
       lastActivityAt: now,
       nextReviewAt: input.nextReviewAt ?? null,
       createdAt: now,
@@ -494,7 +588,13 @@ export function createFoundationRepository({
               }
               projects.put(updated);
               let eventType = 'project.updated';
-              if (current.status !== updated.status) {
+              if (JSON.stringify(current.resources || []) !== JSON.stringify(updated.resources)) {
+                const currentIds = new Set((current.resources || []).map(resource => resource.resourceId));
+                const updatedIds = new Set(updated.resources.map(resource => resource.resourceId));
+                eventType = updated.resources.some(resource => !currentIds.has(resource.resourceId))
+                  ? 'project.resource_added'
+                  : [...currentIds].some(id => !updatedIds.has(id)) ? 'project.resource_removed' : 'project.resource_updated';
+              } else if (current.status !== updated.status) {
                 eventType = updated.status === 'paused' ? 'project.paused'
                   : updated.status === 'active' && current.status === 'paused' ? 'project.resumed'
                     : updated.status === 'completed' ? 'project.completed'
@@ -507,7 +607,13 @@ export function createFoundationRepository({
           } else {
             projects.put(updated);
             let eventType = 'project.updated';
-            if (current.status !== updated.status) {
+            if (JSON.stringify(current.resources || []) !== JSON.stringify(updated.resources)) {
+              const currentIds = new Set((current.resources || []).map(resource => resource.resourceId));
+              const updatedIds = new Set(updated.resources.map(resource => resource.resourceId));
+              eventType = updated.resources.some(resource => !currentIds.has(resource.resourceId))
+                ? 'project.resource_added'
+                : [...currentIds].some(id => !updatedIds.has(id)) ? 'project.resource_removed' : 'project.resource_updated';
+            } else if (current.status !== updated.status) {
               eventType = updated.status === 'paused' ? 'project.paused'
                 : updated.status === 'active' && current.status === 'paused' ? 'project.resumed'
                   : updated.status === 'completed' ? 'project.completed'
@@ -532,6 +638,75 @@ export function createFoundationRepository({
     return updateProject(projectId, { status: 'archived' });
   }
 
+  async function mutateProjectResource(projectId, resourceId, input, operation) {
+    requireNonEmptyString(projectId, 'projectId');
+    const deviceId = await getDeviceId();
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([PROJECT_STORE_NAME, STORE_NAME], 'readwrite');
+      const projects = transaction.objectStore(PROJECT_STORE_NAME);
+      const activity = transaction.objectStore(STORE_NAME);
+      let result;
+      let failure;
+      const request = projects.get(projectId);
+      request.onsuccess = () => {
+        try {
+          const current = request.result;
+          if (!current) throw new Error(`Project not found: ${projectId}`);
+          const resources = current.resources || [];
+          const index = resources.findIndex(resource => resource.resourceId === resourceId);
+          if (operation !== 'add' && index < 0) throw new Error(`Project resource not found: ${resourceId}`);
+          const now = new Date().toISOString();
+          let resource;
+          let nextResources;
+          if (operation === 'remove') {
+            resource = resources[index];
+            nextResources = resources.filter(item => item.resourceId !== resourceId);
+          } else {
+            resource = validateProjectResource({
+              resourceId: operation === 'add' ? makeId() : resourceId,
+              title: input.title,
+              url: input.url,
+              createdAt: operation === 'add' ? now : resources[index].createdAt,
+              updatedAt: now
+            });
+            nextResources = operation === 'add'
+              ? [...resources, resource]
+              : resources.map(item => item.resourceId === resourceId ? resource : item);
+          }
+          const updated = validateProjectRecord({ ...current, resources: nextResources, updatedAt: now, lastActivityAt: now });
+          projects.put(updated);
+          const eventName = operation === 'add' ? 'project.resource_added'
+            : operation === 'remove' ? 'project.resource_removed' : 'project.resource_updated';
+          activity.add(createActivityEvent(deviceId, eventName, { type: 'project', id: projectId }, {
+            resourceId: resource.resourceId,
+            title: resource.title,
+            ...(operation === 'remove' ? {} : { url: resource.url })
+          }));
+          result = { project: updated, resource };
+        } catch (error) {
+          failure = error;
+          transaction.abort();
+        }
+      };
+      transaction.oncomplete = () => resolve(result);
+      transaction.onerror = () => reject(failure || transaction.error || new Error('Could not update project resources.'));
+      transaction.onabort = () => reject(failure || transaction.error || new Error('Could not update project resources.'));
+    });
+  }
+
+  async function addProjectResource(projectId, input) {
+    return mutateProjectResource(projectId, null, input, 'add');
+  }
+
+  async function updateProjectResource(projectId, resourceId, input) {
+    return mutateProjectResource(projectId, resourceId, input, 'update');
+  }
+
+  async function removeProjectResource(projectId, resourceId) {
+    return mutateProjectResource(projectId, resourceId, null, 'remove');
+  }
+
   async function createTask(input) {
     const now = new Date().toISOString();
     const taskId = requireNonEmptyString(input.taskId || makeId(), 'taskId');
@@ -554,7 +729,8 @@ export function createFoundationRepository({
       const storeNames = projectId ? [PROJECT_STORE_NAME, TASK_STORE_NAME, STORE_NAME] : [TASK_STORE_NAME, STORE_NAME];
       const transaction = db.transaction(storeNames, 'readwrite');
       const tasks = transaction.objectStore(TASK_STORE_NAME);
-      const event = createActivityEvent(deviceId, 'task.created', { type: 'task', id: taskId }, { title: task.title }, projectId ? [{ type: 'project', id: projectId }] : []);
+      const sourceModule = input.sourceModule || BUILD_SOURCE_MODULE;
+      const event = createActivityEvent(deviceId, 'task.created', { type: 'task', id: taskId }, { title: task.title }, projectId ? [{ type: 'project', id: projectId }] : [], sourceModule);
       let failure;
       const write = () => {
         tasks.add(task);
@@ -588,13 +764,15 @@ export function createFoundationRepository({
     return requestResult(db.transaction(TASK_STORE_NAME, 'readonly').objectStore(TASK_STORE_NAME).get(taskId));
   }
 
-  async function listTasks({ projectId } = {}) {
+  async function listTasks({ projectId, status } = {}) {
     const db = await openDatabase();
     const store = db.transaction(TASK_STORE_NAME, 'readonly').objectStore(TASK_STORE_NAME);
     const tasks = projectId === undefined
       ? await requestResult(store.getAll())
       : await requestResult(store.index('byProjectId').getAll(projectId));
-    return tasks.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.taskId.localeCompare(b.taskId));
+    return tasks
+      .filter(task => status === undefined || task.status === status)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.taskId.localeCompare(b.taskId));
   }
 
   async function updateTask(taskId, changes) {
@@ -615,7 +793,8 @@ export function createFoundationRepository({
           const current = request.result;
           if (!current) throw new Error(`Task not found: ${taskId}`);
           const now = new Date().toISOString();
-          const merged = { ...current, ...changes, taskId, projectId: current.projectId, updatedAt: now };
+          const { sourceModule = current.projectId ? BUILD_SOURCE_MODULE : PLAN_SOURCE_MODULE, ...taskChanges } = changes;
+          const merged = { ...current, ...taskChanges, taskId, projectId: current.projectId, updatedAt: now };
           if (merged.status === 'completed' && current.status !== 'completed') merged.completedAt = now;
           else if (merged.status !== 'completed') merged.completedAt = null;
           updated = validateTaskRecord(merged);
@@ -628,7 +807,7 @@ export function createFoundationRepository({
             tasks.put(updated);
             if (project) projects.put({ ...project, updatedAt: now, lastActivityAt: now });
             const type = updated.status === 'completed' && current.status !== 'completed' ? 'task.completed' : 'task.updated';
-            activity.add(createActivityEvent(deviceId, type, { type: 'task', id: taskId }, { title: updated.title, status: updated.status, changes: changedFields }, updated.projectId ? [{ type: 'project', id: updated.projectId }] : []));
+            activity.add(createActivityEvent(deviceId, type, { type: 'task', id: taskId }, { title: updated.title, status: updated.status, changes: changedFields }, updated.projectId ? [{ type: 'project', id: updated.projectId }] : [], sourceModule));
           };
           if (updated.projectId) {
             const projectRequest = projects.get(updated.projectId);
@@ -656,6 +835,55 @@ export function createFoundationRepository({
 
   async function completeTask(taskId) {
     return updateTask(taskId, { status: 'completed' });
+  }
+
+  async function deleteTask(taskId, { sourceModule = PLAN_SOURCE_MODULE } = {}) {
+    requireNonEmptyString(taskId, 'taskId');
+    const deviceId = await getDeviceId();
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([PROJECT_STORE_NAME, TASK_STORE_NAME, STORE_NAME], 'readwrite');
+      const projects = transaction.objectStore(PROJECT_STORE_NAME);
+      const tasks = transaction.objectStore(TASK_STORE_NAME);
+      const activity = transaction.objectStore(STORE_NAME);
+      let removed;
+      let failure;
+      const request = tasks.get(taskId);
+      request.onsuccess = () => {
+        removed = request.result;
+        if (!removed) {
+          failure = new Error(`Task not found: ${taskId}`);
+          transaction.abort();
+          return;
+        }
+        const finish = project => {
+          tasks.delete(taskId);
+          if (project) {
+            const now = new Date().toISOString();
+            const updated = { ...project, updatedAt: now, lastActivityAt: now };
+            if (updated.nextActionId === taskId) updated.nextActionId = null;
+            projects.put(updated);
+          }
+          activity.add(createActivityEvent(deviceId, 'task.deleted', { type: 'task', id: taskId }, { title: removed.title }, removed.projectId ? [{ type: 'project', id: removed.projectId }] : [], sourceModule));
+        };
+        if (!removed.projectId) {
+          finish(null);
+          return;
+        }
+        const projectRequest = projects.get(removed.projectId);
+        projectRequest.onsuccess = () => {
+          if (!projectRequest.result) {
+            failure = new Error(`Project not found: ${removed.projectId}`);
+            transaction.abort();
+            return;
+          }
+          finish(projectRequest.result);
+        };
+      };
+      transaction.oncomplete = () => resolve(removed);
+      transaction.onerror = () => reject(failure || transaction.error || new Error('Could not delete task.'));
+      transaction.onabort = () => reject(failure || transaction.error || new Error('Could not delete task.'));
+    });
   }
 
   async function setProjectNextAction(projectId, taskId) {
@@ -716,12 +944,184 @@ export function createFoundationRepository({
     }
     const tasks = await listTasks({ projectId });
     const taskIds = new Set(tasks.map(task => task.taskId));
-    const events = await queryEvents({ sourceModule: BUILD_SOURCE_MODULE, limit: MAX_QUERY_LIMIT });
+    const events = await queryEvents({ limit: MAX_QUERY_LIMIT });
     return events
       .filter(event => (event.subject.type === 'project' && event.subject.id === projectId)
-        || (event.subject.type === 'task' && taskIds.has(event.subject.id)))
+        || (event.subject.type === 'task' && taskIds.has(event.subject.id))
+        || event.relatedEntities.some(entity => entity.type === 'project' && entity.id === projectId))
       .sort((a, b) => eventOrder(b, a))
       .slice(0, limit);
+  }
+
+  async function createNote(input) {
+    const now = new Date().toISOString();
+    const noteId = requireNonEmptyString(input.noteId || makeId(), 'noteId');
+    const note = validateNoteRecord({
+      noteId,
+      title: input.title,
+      content: input.content ?? '',
+      createdAt: now,
+      updatedAt: now,
+      projectId: input.projectId ?? null,
+      tags: input.tags ?? [],
+      status: 'active',
+      archivedAt: null
+    });
+    const deviceId = await getDeviceId();
+    const db = await openDatabase();
+    const storeNames = note.projectId ? [NOTE_STORE_NAME, PROJECT_STORE_NAME, STORE_NAME] : [NOTE_STORE_NAME, STORE_NAME];
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(storeNames, 'readwrite');
+      const notes = transaction.objectStore(NOTE_STORE_NAME);
+      const save = project => {
+        notes.add(note);
+        transaction.objectStore(STORE_NAME).add(createActivityEvent(deviceId, 'note.created', { type: 'note', id: noteId }, { title: note.title }, note.projectId ? [{ type: 'project', id: note.projectId }] : [], THINK_SOURCE_MODULE));
+        if (project) transaction.objectStore(PROJECT_STORE_NAME).put({ ...project, updatedAt: now, lastActivityAt: now });
+      };
+      if (!note.projectId) save(null);
+      else {
+        const projectRequest = transaction.objectStore(PROJECT_STORE_NAME).get(note.projectId);
+        projectRequest.onsuccess = () => {
+          if (!projectRequest.result) {
+            transaction.abort();
+            return;
+          }
+          save(projectRequest.result);
+        };
+      }
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error || new Error('Could not create note.'));
+      transaction.onabort = () => reject(transaction.error || new Error(note.projectId ? `Project not found: ${note.projectId}` : 'Could not create note.'));
+    });
+    return note;
+  }
+
+  async function getNote(noteId) {
+    requireNonEmptyString(noteId, 'noteId');
+    const db = await openDatabase();
+    return requestResult(db.transaction(NOTE_STORE_NAME, 'readonly').objectStore(NOTE_STORE_NAME).get(noteId));
+  }
+
+  async function listNotes(options = {}) {
+    const { projectId } = options;
+    const status = Object.hasOwn(options, 'status') ? options.status : 'active';
+    const db = await openDatabase();
+    const store = db.transaction(NOTE_STORE_NAME, 'readonly').objectStore(NOTE_STORE_NAME);
+    const notes = projectId === undefined
+      ? await requestResult(store.getAll())
+      : await requestResult(store.index('byProjectId').getAll(projectId));
+    return notes
+      .filter(note => status === undefined || note.status === status)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.noteId.localeCompare(b.noteId));
+  }
+
+  async function updateNote(noteId, changes) {
+    requireNonEmptyString(noteId, 'noteId');
+    if (!isPlainObject(changes)) throw new TypeError('Note changes must be an object.');
+    const deviceId = await getDeviceId();
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([NOTE_STORE_NAME, PROJECT_STORE_NAME, STORE_NAME], 'readwrite');
+      const notes = transaction.objectStore(NOTE_STORE_NAME);
+      const projects = transaction.objectStore(PROJECT_STORE_NAME);
+      const activity = transaction.objectStore(STORE_NAME);
+      let updated;
+      let failure;
+      const request = notes.get(noteId);
+      request.onsuccess = () => {
+        try {
+          const current = request.result;
+          if (!current) throw new Error(`Note not found: ${noteId}`);
+          const now = new Date().toISOString();
+          const merged = validateNoteRecord({ ...current, ...changes, noteId, updatedAt: now });
+          const changedFields = Object.keys(merged).filter(key => key !== 'updatedAt' && JSON.stringify(merged[key]) !== JSON.stringify(current[key]));
+          if (!changedFields.length) {
+            updated = current;
+            return;
+          }
+          updated = merged;
+          const save = project => {
+            notes.put(updated);
+            if (project) projects.put({ ...project, updatedAt: now, lastActivityAt: now });
+            const eventType = current.status !== updated.status
+              ? updated.status === 'archived' ? 'note.archived' : 'note.restored'
+              : 'note.updated';
+            activity.add(createActivityEvent(deviceId, eventType, { type: 'note', id: noteId }, { title: updated.title, changes: changedFields }, updated.projectId ? [{ type: 'project', id: updated.projectId }] : [], THINK_SOURCE_MODULE));
+          };
+          if (updated.projectId) {
+            const projectRequest = projects.get(updated.projectId);
+            projectRequest.onsuccess = () => {
+              if (!projectRequest.result) {
+                failure = new Error(`Project not found: ${updated.projectId}`);
+                transaction.abort();
+                return;
+              }
+              save(projectRequest.result);
+            };
+          } else save(null);
+        } catch (error) {
+          failure = error;
+          transaction.abort();
+        }
+      };
+      transaction.oncomplete = () => resolve(updated);
+      transaction.onerror = () => reject(failure || transaction.error || new Error('Could not update note.'));
+      transaction.onabort = () => reject(failure || transaction.error || new Error('Could not update note.'));
+    });
+  }
+
+  async function archiveNote(noteId) {
+    const note = await getNote(noteId);
+    if (!note) throw new Error(`Note not found: ${noteId}`);
+    if (note.status === 'archived') return note;
+    const now = new Date().toISOString();
+    return updateNote(noteId, { status: 'archived', archivedAt: now });
+  }
+
+  async function deleteNote(noteId) {
+    requireNonEmptyString(noteId, 'noteId');
+    const deviceId = await getDeviceId();
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([NOTE_STORE_NAME, PROJECT_STORE_NAME, STORE_NAME], 'readwrite');
+      const notes = transaction.objectStore(NOTE_STORE_NAME);
+      const projects = transaction.objectStore(PROJECT_STORE_NAME);
+      const activity = transaction.objectStore(STORE_NAME);
+      let removed;
+      let failure;
+      const request = notes.get(noteId);
+      request.onsuccess = () => {
+        removed = request.result;
+        if (!removed) {
+          failure = new Error(`Note not found: ${noteId}`);
+          transaction.abort();
+          return;
+        }
+        const save = project => {
+          notes.delete(noteId);
+          if (project) {
+            const now = new Date().toISOString();
+            projects.put({ ...project, updatedAt: now, lastActivityAt: now });
+          }
+          activity.add(createActivityEvent(deviceId, 'note.deleted', { type: 'note', id: noteId }, { title: removed.title }, removed.projectId ? [{ type: 'project', id: removed.projectId }] : [], THINK_SOURCE_MODULE));
+        };
+        if (!removed.projectId) save(null);
+        else {
+          const projectRequest = projects.get(removed.projectId);
+          projectRequest.onsuccess = () => {
+            if (!projectRequest.result) {
+              failure = new Error(`Project not found: ${removed.projectId}`);
+              transaction.abort();
+              return;
+            }
+            save(projectRequest.result);
+          };
+        }
+      };
+      transaction.oncomplete = () => resolve(removed);
+      transaction.onerror = () => reject(failure || transaction.error || new Error('Could not delete note.'));
+      transaction.onabort = () => reject(failure || transaction.error || new Error('Could not delete note.'));
+    });
   }
 
   function close() {
@@ -745,13 +1145,23 @@ export function createFoundationRepository({
     listProjects,
     updateProject,
     archiveProject,
+    addProjectResource,
+    updateProjectResource,
+    removeProjectResource,
     createTask,
     getTask,
     listTasks,
     updateTask,
     completeTask,
+    deleteTask,
     setProjectNextAction,
     queryProjectActivity,
+    createNote,
+    getNote,
+    listNotes,
+    updateNote,
+    archiveNote,
+    deleteNote,
     close
   });
 }

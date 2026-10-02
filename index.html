@@ -17,8 +17,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=mohit-os-20261002" />
-  <link rel="stylesheet" href="styles-build.css?v=build-20261003-5" />
+  <link rel="stylesheet" href="styles.css?v=mohit-os-20261003-1" />
+  <link rel="stylesheet" href="styles-build.css?v=os-v1-20261003-2" />
 </head>
 <body>
   <div class="app-shell">
@@ -28,9 +28,11 @@
         <span><b>MOHIT.OS</b><small>Learn · Build · Think</small></span>
       </a>
       <nav class="os-areas" aria-label="MOHIT.OS areas">
-        <button class="os-area active" type="button" data-area-switch="learn" aria-current="page">LEARN</button>
-        <button class="os-area" type="button" data-build-nav>BUILD</button>
-        <span class="os-area future" aria-label="THINK, future area">THINK <small>SOON</small></span>
+        <button class="os-area active" type="button" data-area-module="learn" data-area-switch="learn" aria-current="page">LEARN</button>
+        <button class="os-area" type="button" data-area-module="build" data-build-nav>BUILD</button>
+        <button class="os-area" type="button" data-area-module="think">THINK</button>
+        <button class="os-area" type="button" data-area-module="plan">PLAN</button>
+        <button class="os-area" type="button" data-area-module="activity">ACTIVITY</button>
       </nav>
       <a class="learning-module" href="#dashboard" aria-label="Open A2Z DSA learning module">
         <span class="module-mark">A2Z</span>
@@ -48,6 +50,19 @@
       <nav class="primary-nav" data-area-nav="build" aria-label="BUILD navigation" hidden>
         <button class="nav-item active" data-build-nav><span class="nav-icon">▣</span>Projects</button>
         <button class="nav-item build-mobile-learn" data-area-switch="learn"><span class="nav-icon">‹</span>LEARN</button>
+      </nav>
+      <div class="nav-label" data-area-label="os" hidden>MOHIT.OS</div>
+      <nav class="primary-nav os-section-nav" data-area-nav="os" aria-label="MOHIT.OS section" hidden>
+        <button class="nav-item" data-os-section="think"><span class="nav-icon">✎</span>Notes</button>
+        <button class="nav-item" data-os-section="plan"><span class="nav-icon">✓</span>Tasks &amp; reminders</button>
+        <button class="nav-item" data-os-section="activity"><span class="nav-icon">◷</span>Activity</button>
+      </nav>
+      <nav class="primary-nav os-mobile-nav" aria-label="MOHIT.OS modules" hidden>
+        <button class="nav-item" data-area-module="learn" data-area-switch="learn"><span class="nav-icon">A</span>LEARN</button>
+        <button class="nav-item" data-area-module="build" data-build-nav><span class="nav-icon">▣</span>BUILD</button>
+        <button class="nav-item" data-area-module="think"><span class="nav-icon">✎</span>THINK</button>
+        <button class="nav-item" data-area-module="plan"><span class="nav-icon">✓</span>PLAN</button>
+        <button class="nav-item" data-area-module="activity"><span class="nav-icon">◷</span>ACTIVITY</button>
       </nav>
       <div class="sidebar-bottom">
         <div class="local-card"><span class="local-dot"></span><div><b>Saved on this device</b><small>Your progress stays private</small></div></div>
@@ -106,6 +121,15 @@
       <section class="page build-page" id="build-page" aria-labelledby="build-heading">
         <div id="build-app" aria-live="polite"><p class="build-message">Opening local project storage…</p></div>
       </section>
+      <section class="page os-page" id="think-page" aria-labelledby="think-heading">
+        <div id="think-app" aria-live="polite"></div>
+      </section>
+      <section class="page os-page" id="plan-page" aria-labelledby="plan-heading">
+        <div id="plan-app" aria-live="polite"></div>
+      </section>
+      <section class="page os-page" id="activity-page" aria-labelledby="activity-heading">
+        <div id="activity-app" aria-live="polite"></div>
+      </section>
       <footer class="page-footer"><span>MOHIT.OS · Learn · Build · Think</span><span>Progress is stored locally in your browser.</span></footer>
     </main>
   </div>
@@ -113,7 +137,8 @@
   <script src="curriculum.js?v=sync-20260930"></script>
   <script src="src/qr.js?v=pair-20261001"></script>
   <script src="src/app.js?v=mohit-os-20261002"></script>
-  <script type="module" src="src/foundation/bootstrap.mjs?v=foundation-20261003-5"></script>
-  <script type="module" src="src/build/app.mjs?v=build-20261003-5"></script>
+  <script type="module" src="src/foundation/bootstrap.mjs?v=foundation-20261003-7"></script>
+  <script type="module" src="src/build/app.mjs?v=build-20261003-7"></script>
+  <script type="module" src="src/os/app.mjs?v=os-v1-20261003-2"></script>
 </body>
 </html>

@@ -40,7 +40,7 @@
 @media(max-width:720px){.sidebar{height:58px;min-height:58px;padding:6px 9px}.sidebar>.brand{display:none}.primary-nav{width:100%;margin:0;justify-content:space-around;gap:3px}.nav-item{flex:1;justify-content:center;padding:7px 4px;font-size:9px;gap:4px}.nav-icon{font-size:12px}.nav-count{font-size:8px;padding:1px 3px}}
 
 /* MOHIT.OS → LEARN → A2Z DSA navigation */
-.os-areas{display:flex;gap:5px;margin:0 5px 15px}
+.os-areas{display:flex;flex-wrap:wrap;gap:5px;margin:0 5px 15px}
 .os-area{min-height:28px;display:flex;align-items:center;gap:5px;padding:0 8px;border:1px solid #e8edf5;border-radius:7px;color:#8290a2;font-family:inherit;font-size:9px;font-weight:800;letter-spacing:.45px;cursor:pointer}
 .os-area.active{border-color:#dce6ff;background:#f1f5ff;color:#4167c9}
 .os-area.future{color:#a2adbb}

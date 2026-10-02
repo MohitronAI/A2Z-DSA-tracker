@@ -1,5 +1,5 @@
-const CACHE_NAME = 'striver-a2z-static-v17';
-const ASSETS = ['./', './index.html', './styles.css?v=mohit-os-20261002', './styles-build.css?v=build-20261003-5', './config.js?v=supabase-20260930', './curriculum.js?v=sync-20260930', './src/qr.js?v=pair-20261001', './src/app.js?v=mohit-os-20261002', './src/foundation/repository.mjs?v=foundation-20261003-5', './src/foundation/bootstrap.mjs?v=foundation-20261003-5', './src/build/app.mjs?v=build-20261003-5', './manifest.webmanifest?v=mohit-os-20261002', './icons/icon-192.svg', './icons/icon-512.svg', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE_NAME = 'striver-a2z-static-v19';
+const ASSETS = ['./', './index.html', './styles.css?v=mohit-os-20261003-1', './styles-build.css?v=os-v1-20261003-2', './config.js?v=supabase-20260930', './curriculum.js?v=sync-20260930', './src/qr.js?v=pair-20261001', './src/app.js?v=mohit-os-20261002', './src/foundation/repository.mjs?v=foundation-20261003-7', './src/foundation/actions.mjs?v=os-v1-20261003-1', './src/foundation/bootstrap.mjs?v=foundation-20261003-7', './src/build/app.mjs?v=build-20261003-7', './src/os/app.mjs?v=os-v1-20261003-2', './manifest.webmanifest?v=mohit-os-20261002', './icons/icon.svg', './icons/icon-192.svg', './icons/icon-512.svg', './icons/icon-192.png', './icons/icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
