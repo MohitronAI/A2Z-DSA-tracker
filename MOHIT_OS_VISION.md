@@ -34,7 +34,7 @@ Current hierarchy:
 
 `MOHIT.OS → ACTIVITY`
 
-LEARN contains the existing A2Z tracker. BUILD, THINK, PLAN, and ACTIVITY provide local-only projects/resources, notes, dated tasks, and shared meaningful-change history. Future AI, voice, notifications, calendar, and cloud sync remain inactive.
+LEARN contains the existing A2Z tracker. BUILD, THINK, PLAN, and ACTIVITY provide local-only projects/resources, categorized notes, dated tasks, shared meaningful-change history, and grouped global search. Future AI, voice, notifications, calendar, and cloud sync remain inactive.
 
 ## 3. CURRENT STATE
 
@@ -44,7 +44,7 @@ The existing A2Z DSA functionality must continue working while MOHIT.OS expands.
 
 Do not rebuild the A2Z tracker from scratch or replace working architecture without a specific reason.
 
-The Foundation stores Projects, Tasks, Notes, resources, and ActivityEvents. A2Z progress has not been migrated or connected to it. The action service exposes structured operations; it is not an AI interface and does not grant access to arbitrary DOM or database records.
+The version-4 Foundation stores Projects, Tasks, typed Notes, resources, and ActivityEvents. Version 4 preserves existing data and backfills legacy notes as `Note`. A2Z progress has not been migrated or connected to it. The action service exposes structured operations; it is not an AI interface and does not grant access to arbitrary DOM or database records.
 
 ## 4. Product Direction
 
@@ -66,10 +66,10 @@ Local project context and task tracking are implemented, including descriptions,
 The purpose is to prevent projects from being forgotten after a presentation or milestone.
 
 ### THINK
-Initial local notes with tags, search, archive/restore, and optional project association are implemented. Broader decision, reflection, and knowledge-management features remain future work.
+Local Note, Idea, Learning, and Decision captures support tags, search, type/project filters, archive/restore, and optional project association. Broader decision, reflection, and knowledge-management features remain future work.
 
 ### PLAN
-Initial local tasks with status, priority, optional project association, and optional due/reminder date are implemented. Calendar, notifications, and scheduled work remain future work.
+Local tasks with status, priority, optional project association, and optional due/reminder date are implemented, with Today, Upcoming, and All views. Calendar, notifications, and scheduled work remain future work.
 
 ### TRACK
 A future consistency and progress system:
@@ -97,7 +97,7 @@ Instead of only saying:
 They should explain why something matters using relevant project and activity context.
 
 ### ACTIVITY
-ACTIVITY currently presents meaningful local changes across BUILD, THINK, and PLAN. It should eventually provide richer historical context for the dashboard and AI.
+ACTIVITY currently presents and filters meaningful local changes across BUILD, THINK, and PLAN. It should eventually provide richer historical context for the dashboard and AI; A2Z activity is not yet adapted into the timeline.
 
 ## 5. Accountability System
 

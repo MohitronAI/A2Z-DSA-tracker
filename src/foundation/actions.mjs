@@ -1,13 +1,26 @@
 const A2Z_PROGRESS_KEY = 'striver-a2z-progress-v1';
 const REQUIRED_ACTIONS = [
-  'readProject', 'createProject', 'updateProject', 'createTask', 'updateTask',
-  'completeTask', 'createNote', 'updateNote', 'createReminder', 'setProjectNextAction', 'search',
+  'readProject', 'listProjects', 'createProject', 'updateProject',
+  'readTask', 'listTasks', 'createTask', 'updateTask', 'completeTask',
+  'readNote', 'listNotes', 'createNote', 'updateNote',
+  'addProjectResource', 'updateProjectResource', 'removeProjectResource',
+  'setProjectNextAction', 'createReminder', 'searchOS', 'search',
   'queryActivity', 'queryA2ZProgress'
 ];
 
 function requireText(value, name) {
   if (typeof value !== 'string' || !value.trim()) throw new TypeError(`${name} must be a non-empty string.`);
   return value;
+}
+
+function eventTitle(event) {
+  return event.payload?.title || event.payload?.name || event.type.replaceAll('.', ' ');
+}
+
+function sortResults(results) {
+  return results.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)
+    || a.type.localeCompare(b.type)
+    || a.id.localeCompare(b.id));
 }
 
 export function actionServiceContract(actions) {
@@ -17,33 +30,61 @@ export function actionServiceContract(actions) {
 export function createMohitOsActions(repository, { storage = globalThis.localStorage } = {}) {
   if (!repository) throw new TypeError('A Foundation repository is required.');
 
-  async function search(query, { includeArchived = false } = {}) {
+  async function searchOS(query, { includeArchived = false } = {}) {
     const term = String(query || '').trim().toLocaleLowerCase();
-    if (!term) return [];
-    const [projects, tasks, notes] = await Promise.all([
+    const groups = { projects: [], notes: [], tasks: [], activity: [] };
+    if (!term) return groups;
+
+    const [projects, tasks, notes, events] = await Promise.all([
       repository.listProjects({ includeArchived }),
       repository.listTasks(),
-      repository.listNotes({ status: includeArchived ? undefined : 'active' })
+      repository.listNotes({ status: includeArchived ? undefined : 'active' }),
+      repository.queryEvents({ limit: 1000 })
     ]);
-    const results = [];
+    const projectNames = new Map(projects.map(project => [project.projectId, project.name]));
+
     for (const project of projects) {
       const resources = project.resources.map(resource => `${resource.title} ${resource.url}`).join(' ');
       if (`${project.name} ${project.description} ${project.currentState} ${project.blockers.join(' ')} ${resources}`.toLocaleLowerCase().includes(term)) {
-        results.push({ type: 'project', id: project.projectId, title: project.name, subtitle: project.currentState, updatedAt: project.updatedAt, projectId: project.projectId });
+        groups.projects.push({ type: 'project', id: project.projectId, title: project.name, subtitle: project.currentState, updatedAt: project.updatedAt, projectId: project.projectId });
       }
     }
     for (const task of tasks) {
       if (!includeArchived && ['completed', 'cancelled'].includes(task.status)) continue;
-      if (task.title.toLocaleLowerCase().includes(term)) {
-        results.push({ type: 'task', id: task.taskId, title: task.title, subtitle: task.status, updatedAt: task.updatedAt, projectId: task.projectId });
+      const projectName = projectNames.get(task.projectId) || '';
+      if (`${task.title} ${projectName}`.toLocaleLowerCase().includes(term)) {
+        groups.tasks.push({ type: 'task', id: task.taskId, title: task.title, subtitle: `${task.status}${projectName ? ` · ${projectName}` : ''}`, updatedAt: task.updatedAt, projectId: task.projectId });
       }
     }
     for (const note of notes) {
-      if (`${note.title} ${note.content} ${note.tags.join(' ')}`.toLocaleLowerCase().includes(term)) {
-        results.push({ type: 'note', id: note.noteId, title: note.title, subtitle: note.tags.join(', '), updatedAt: note.updatedAt, projectId: note.projectId });
+      const projectName = projectNames.get(note.projectId) || '';
+      if (`${note.type} ${note.title} ${note.content} ${note.tags.join(' ')} ${projectName}`.toLocaleLowerCase().includes(term)) {
+        groups.notes.push({ type: 'note', id: note.noteId, title: note.title, subtitle: `${note.type}${projectName ? ` · ${projectName}` : ''}${note.tags.length ? ` · ${note.tags.join(', ')}` : ''}`, updatedAt: note.updatedAt, projectId: note.projectId });
       }
     }
-    return results.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.type.localeCompare(b.type) || a.id.localeCompare(b.id));
+    for (const event of events) {
+      const relatedProject = event.subject.type === 'project'
+        ? event.subject.id
+        : event.relatedEntities.find(entity => entity.type === 'project')?.id || null;
+      const searchable = `${event.type} ${event.sourceModule} ${event.subject.type} ${projectNames.get(relatedProject) || ''} ${JSON.stringify(event.payload)}`.toLocaleLowerCase();
+      if (searchable.includes(term)) {
+        groups.activity.push({
+          type: 'activity',
+          id: event.eventId,
+          title: eventTitle(event),
+          subtitle: `${event.type} · ${event.sourceModule}`,
+          updatedAt: event.occurredAt,
+          projectId: relatedProject
+        });
+      }
+    }
+    for (const group of Object.values(groups)) sortResults(group);
+    return groups;
+  }
+
+  async function search(query, options) {
+    const groups = await searchOS(query, options);
+    return sortResults(Object.values(groups).flat());
   }
 
   async function queryA2ZProgress() {
@@ -82,17 +123,22 @@ export function createMohitOsActions(repository, { storage = globalThis.localSto
 
   return Object.freeze({
     readProject: projectId => repository.getProject(requireText(projectId, 'projectId')),
+    listProjects: options => repository.listProjects(options),
     createProject: input => repository.createProject(input),
     updateProject: (projectId, changes) => repository.updateProject(requireText(projectId, 'projectId'), changes),
-    addProjectResource: (projectId, input) => repository.addProjectResource(projectId, input),
-    updateProjectResource: (projectId, resourceId, input) => repository.updateProjectResource(projectId, resourceId, input),
-    removeProjectResource: (projectId, resourceId) => repository.removeProjectResource(projectId, resourceId),
-    setProjectNextAction: (projectId, taskId) => repository.setProjectNextAction(projectId, taskId),
+    addProjectResource: (projectId, input) => repository.addProjectResource(requireText(projectId, 'projectId'), input),
+    updateProjectResource: (projectId, resourceId, input) => repository.updateProjectResource(requireText(projectId, 'projectId'), requireText(resourceId, 'resourceId'), input),
+    removeProjectResource: (projectId, resourceId) => repository.removeProjectResource(requireText(projectId, 'projectId'), requireText(resourceId, 'resourceId')),
+    setProjectNextAction: (projectId, taskId) => repository.setProjectNextAction(requireText(projectId, 'projectId'), taskId === null ? null : requireText(taskId, 'taskId')),
+    readTask: taskId => repository.getTask(requireText(taskId, 'taskId')),
+    listTasks: options => repository.listTasks(options),
     createTask: input => repository.createTask({ ...input, sourceModule: input.sourceModule || 'plan.tasks' }),
     updateTask: (taskId, changes = {}) => repository.updateTask(requireText(taskId, 'taskId'), { ...changes, sourceModule: changes.sourceModule || 'plan.tasks' }),
     completeTask: (taskId, { sourceModule = 'plan.tasks' } = {}) => repository.updateTask(requireText(taskId, 'taskId'), { status: 'completed', sourceModule }),
     cancelTask: taskId => repository.updateTask(requireText(taskId, 'taskId'), { status: 'cancelled', sourceModule: 'plan.tasks' }),
     deleteTask: taskId => repository.deleteTask(requireText(taskId, 'taskId'), { sourceModule: 'plan.tasks' }),
+    readNote: noteId => repository.getNote(requireText(noteId, 'noteId')),
+    listNotes: options => repository.listNotes(options),
     createNote: input => repository.createNote(input),
     updateNote: (noteId, changes) => repository.updateNote(requireText(noteId, 'noteId'), changes),
     archiveNote: noteId => repository.archiveNote(requireText(noteId, 'noteId')),
@@ -102,6 +148,7 @@ export function createMohitOsActions(repository, { storage = globalThis.localSto
       if (!dueAt) throw new TypeError('A reminder requires a dueAt or remindAt value.');
       return repository.createTask({ ...input, dueAt, sourceModule: 'plan.tasks' });
     },
+    searchOS,
     search,
     queryActivity: options => repository.queryEvents(options),
     queryA2ZProgress

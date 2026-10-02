@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=mohit-os-20261003-1" />
-  <link rel="stylesheet" href="styles-build.css?v=os-v1-20261003-2" />
+  <link rel="stylesheet" href="styles-build.css?v=os-v1-20261003-4" />
 </head>
 <body>
   <div class="app-shell">
@@ -68,10 +68,22 @@
         <div class="local-card"><span class="local-dot"></span><div><b>Saved on this device</b><small>Your progress stays private</small></div></div>
         <div class="sidebar-foot">A personal learning companion<br><span>Independent from TUF</span></div>
       </div>
+      <dialog class="os-dialog os-global-search" id="os-search-dialog" aria-labelledby="os-search-heading">
+        <div class="os-dialog-heading"><div><h2 id="os-search-heading">Search MOHIT.OS</h2><small>Projects, notes, tasks, and activity</small></div><button class="build-icon-button" type="button" data-os-action="close-dialog" aria-label="Close search">×</button></div>
+        <label class="os-global-search-input">Search<input type="search" data-global-search placeholder="Try a project, idea, or task name" autocomplete="off"></label>
+        <div class="os-search-results" data-search-results aria-live="polite"><p class="os-muted">Search projects, notes, tasks, and activity.</p></div>
+      </dialog>
     </aside>
 
     <main class="main-content">
-      <header class="topbar"><div class="breadcrumb" aria-label="MOHIT.OS, LEARN, A2Z DSA"><span>MOHIT.OS</span><span>/</span><span>LEARN</span><span>/</span><b>A2Z DSA</b><span class="breadcrumb-page-separator">/</span><b id="crumb-current">Dashboard</b></div><div class="top-right"><span class="sync-indicator" id="sync-indicator" aria-live="polite">● Saved locally</span><span class="today-label" id="today-label"></span><span class="avatar">M</span></div></header>
+      <header class="topbar"><div class="breadcrumb" aria-label="MOHIT.OS, LEARN, A2Z DSA"><span>MOHIT.OS</span><span>/</span><span>LEARN</span><span>/</span><b>A2Z DSA</b><span class="breadcrumb-page-separator">/</span><b id="crumb-current">Dashboard</b></div><div class="top-right"><button class="os-global-search-button" type="button" data-os-search-open aria-label="Search MOHIT.OS">⌕ <span>Search</span></button><span class="sync-indicator" id="sync-indicator" aria-live="polite">● Saved locally</span><span class="today-label" id="today-label"></span><span class="avatar">M</span></div></header>
+      <nav class="os-mobile-area-nav" aria-label="MOHIT.OS areas">
+        <button class="os-area active" type="button" data-area-module="learn" data-area-switch="learn" aria-current="page">LEARN</button>
+        <button class="os-area" type="button" data-area-module="build" data-build-nav>BUILD</button>
+        <button class="os-area" type="button" data-area-module="think">THINK</button>
+        <button class="os-area" type="button" data-area-module="plan">PLAN</button>
+        <button class="os-area" type="button" data-area-module="activity">ACTIVITY</button>
+      </nav>
 
       <section class="page active" id="dashboard-page">
         <div class="welcome-row"><div><div class="eyebrow">LEARN · A2Z DSA</div><h1>A2Z DSA</h1><p class="subtitle">A clear view of every lesson you’ve completed so far.</p></div><button class="primary-button" data-go-roadmap>Explore roadmap <span>↗</span></button></div>
@@ -137,8 +149,8 @@
   <script src="curriculum.js?v=sync-20260930"></script>
   <script src="src/qr.js?v=pair-20261001"></script>
   <script src="src/app.js?v=mohit-os-20261002"></script>
-  <script type="module" src="src/foundation/bootstrap.mjs?v=foundation-20261003-7"></script>
-  <script type="module" src="src/build/app.mjs?v=build-20261003-7"></script>
-  <script type="module" src="src/os/app.mjs?v=os-v1-20261003-2"></script>
+  <script type="module" src="src/foundation/bootstrap.mjs?v=foundation-20261003-9"></script>
+  <script type="module" src="src/build/app.mjs?v=build-20261003-9"></script>
+  <script type="module" src="src/os/app.mjs?v=os-v1-20261003-5"></script>
 </body>
 </html>

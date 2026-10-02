@@ -1,6 +1,6 @@
 # MOHIT.OS — Developer Handover Context
 
-> Initial repository snapshot inspected on 2026-10-02. Subsequent Foundation, BUILD V0, and MOHIT.OS V1 usability foundation changes are described below. Always verify live Git/deployment state before acting; this file contains no credentials.
+> Initial repository snapshot inspected on 2026-10-02. Subsequent Foundation, BUILD V0, MOHIT.OS V1, and V1.1 usability changes are described below. Always verify live Git/deployment state before acting; this file contains no credentials.
 
 ## Handover Instructions for the Next Coding Agent
 
@@ -10,14 +10,14 @@ Before changing anything, inspect the current branch and working tree, read this
 
 ## 1. Project Identity and Purpose
 
-MOHIT.OS is a personal learning and creation space. LEARN is a static web application for tracking progress through Take U Forward’s A2Z DSA curriculum. BUILD manages local projects/tasks/resources; THINK manages project-linked notes; PLAN manages project-linked tasks with optional due dates; ACTIVITY presents their shared event history. These modules use the separate Foundation IndexedDB repository. The A2Z tracker retains its optional cloud sync, installable PWA metadata, and offline app-shell support.
+MOHIT.OS is a personal learning and creation space. LEARN is a static web application for tracking progress through Take U Forward’s A2Z DSA curriculum. BUILD manages local projects/tasks/resources; THINK manages categorized, optionally project-linked notes; PLAN manages project-linked tasks with date views; ACTIVITY presents their shared event history; global search groups results across all four. These modules use the separate Foundation IndexedDB repository. The A2Z tracker retains its optional cloud sync, installable PWA metadata, and offline app-shell support.
 
 ## 2. Branding and Hierarchy
 
 - Product: **MOHIT.OS**
 - Tagline: **Learn · Build · Think**
 - Current hierarchy: **LEARN → A2Z DSA**, **BUILD → Projects**, **THINK → Notes**, **PLAN → Tasks & reminders**, and **ACTIVITY**.
-- LEARN contains the existing A2Z tracker. BUILD, THINK, PLAN, and ACTIVITY use local Foundation storage. Other future areas remain inactive.
+- LEARN contains the existing A2Z tracker. BUILD, THINK, PLAN, and ACTIVITY use local Foundation storage. TRACK, AI, voice, notifications, calendar integration, and cloud synchronization for these modules remain future work.
 - Educational/source attribution to Take U Forward (TUF) and Striver is curriculum attribution, not the product name.
 
 The browser title is `MOHIT.OS · A2Z DSA`. The PWA manifest is named `MOHIT.OS · A2Z DSA`, with short name `MOHIT.OS`.
@@ -48,7 +48,7 @@ The browser title is `MOHIT.OS · A2Z DSA`. The PWA manifest is named `MOHIT.OS 
 │   ├── qr.js                        # Small in-app QR encoder; no QR dependency
 │   ├── foundation/                  # Local IndexedDB repository, actions, and bootstrap
 │   ├── build/app.mjs                # BUILD Projects UI
-│   └── os/app.mjs                   # THINK, PLAN, and ACTIVITY UI
+│   └── os/app.mjs                   # THINK, PLAN, ACTIVITY, and global search UI
 ├── styles-build.css                 # BUILD responsive styling
 ├── scripts/
 │   ├── build.mjs                    # Copies static app into dist and writes config
@@ -127,7 +127,7 @@ When a lesson first changes, the app records its first-start time. Every checkbo
 - Build config is optional: without both public Supabase settings, the site remains local-only.
 - Browser storage is origin-scoped. `localhost`, a LAN IP, and each HTTPS hostname have separate localStorage. Switching origin does not itself transfer progress; pair devices through the same configured cloud tracker or use a backup.
 - Backup export/import handles progress records and merges imported progress; it is not an account or credential export.
-- MOHIT.OS Foundation uses a separate version-3 IndexedDB database for ActivityEvents, Projects, Tasks, Notes, and device metadata. BUILD/THINK/PLAN write meaningful events to that store. A2Z does not read from or write to Foundation storage.
+- MOHIT.OS Foundation uses a separate version-4 IndexedDB database for ActivityEvents, Projects, Tasks, typed Notes, and device metadata. Version 4 preserves existing notes and backfills their type as `Note`. BUILD/THINK/PLAN write meaningful events to that store. A2Z does not read from or write to Foundation storage.
 
 ## 10. Supabase Architecture and Sync Flow
 
@@ -213,9 +213,9 @@ Recorded checks in the current project session/history include:
 - `npm run build` completed successfully and produced the static `dist/` output.
 - Curriculum data was evaluated directly and counted as 20 modules, 84 sections, 495 lessons, and 324 non-null direct video URLs.
 - Browser smoke checks confirmed the MOHIT.OS title/brand, LEARN → A2Z DSA navigation, roadmap module totals, manifest metadata, and service-worker/offline status on the deployed app.
-- MOHIT.OS V1 browser smoke covers BUILD projects/resources, THINK notes linked to a project, PLAN tasks/completion, ActivityEvents, reload persistence and migration from Foundation v2, A2Z lesson progress persistence, desktop/mobile navigation, and removal of temporary Foundation smoke records. The original `striver-a2z-progress-v1` value is restored exactly after its regression toggle.
+- MOHIT.OS V1.1 browser smoke covers schema-v3 migration and data preservation, BUILD projects/resources and linked notes/tasks, THINK categories and filters, PLAN Today/Upcoming/All views, grouped global search, Activity filtering, reload persistence, A2Z progress regression, desktop/mobile navigation, and cleanup of temporary Foundation records.
 - Settings on production displayed connected/synced and available-offline status. A clean browser at the separate branded hostname initially showed 0/495 until it had progress locally or was paired; this is expected origin-scoped storage behavior.
-- `npm run validate` checks curriculum and Supabase allowlist invariants, progress contracts, strict timestamps/merge semantics, Foundation and ActivityEvent records, BUILD project/resource/task and THINK note records, action APIs, and cross-module dialog IDs. It is not a browser end-to-end suite. The latest sync UI observations are not a substitute for a fresh two-device edit-and-round-trip test after sync/schema changes. The 324 YouTube URLs have not all been individually revalidated against YouTube availability.
+- `npm run validate` checks curriculum and Supabase allowlist invariants, progress contracts, strict timestamps/merge semantics, Foundation v4 and legacy-note migration contracts, ActivityEvent records, BUILD resource/project, THINK note-type, and PLAN task records, action/search APIs, and cross-module UI IDs. It is not a browser end-to-end suite. The latest sync UI observations are not a substitute for a fresh two-device edit-and-round-trip test after sync/schema changes. The 324 YouTube URLs have not all been individually revalidated against YouTube availability.
 
 V1 modules are local-only and do not change the A2Z cloud contract. Confirm GitHub/production state directly before further integration or deployment work.
 
@@ -230,7 +230,7 @@ V1 modules are local-only and do not change the A2Z cloud contract. Confirm GitH
 
 ## 20. Features Intentionally Not Implemented
 
-- BUILD/THINK/PLAN/ACTIVITY are local-only; cloud sync, notification delivery, calendar integration, autonomous monitoring, and AI are not implemented. PLAN due dates are stored metadata, not alerts.
+- BUILD/THINK/PLAN/ACTIVITY are local-only; cloud sync, notification delivery, calendar integration, autonomous monitoring, and AI are not implemented. PLAN Today/Upcoming views filter stored task dates; due dates do not trigger alerts.
 - Day-by-day schedules, prerequisite locking, or curriculum gates.
 - A separate practice-problem completion area.
 - User registration/login or server-managed account recovery.
@@ -238,11 +238,11 @@ V1 modules are local-only and do not change the A2Z cloud contract. Confirm GitH
 
 ## 21. Current Unfinished Work
 
-The existing A2Z tracker and Foundation are implemented. BUILD, THINK, PLAN, and ACTIVITY add local-only structured OS workflows without changing A2Z progress or Supabase contracts. These records are origin-scoped in Foundation IndexedDB. The known content gap is the 171 lesson records without direct video URLs; a future curriculum audit should verify each against official/public TUF and official Take U Forward/Striver sources before adding a URL.
+The existing A2Z tracker and Foundation are implemented. BUILD, THINK, PLAN, ACTIVITY, and global search add local-only structured OS workflows without changing A2Z progress or Supabase contracts. Foundation schema v4 migrates v3 notes by assigning the default `Note` type while retaining the existing records. These records are origin-scoped in IndexedDB. The known content gap is the 171 lesson records without direct video URLs; a future curriculum audit should verify each against official/public TUF and official Take U Forward/Striver sources before adding a URL.
 
 ## 22. Recommended Next Development Step
 
-Continue the local-first structured OS modules with focused usability/regression work. Keep them separate from A2Z; design cross-device synchronization, notifications, and AI as separate changes with explicit data/version/action contracts.
+Continue local-first usability and regression work in focused milestones. Keep the modules separate from A2Z; design cross-device synchronization, notifications, and AI as separate changes with explicit data/version/action contracts.
 
 ## 23. Architectural Decisions to Preserve
 

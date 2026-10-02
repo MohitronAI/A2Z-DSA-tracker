@@ -44,6 +44,7 @@ function setArea(area) {
     if (active) tab.setAttribute('aria-current', 'page');
     else tab.removeAttribute('aria-current');
   });
+
   if (isBuild) {
     document.querySelectorAll('.page').forEach(page => page.classList.toggle('active', page === buildPage));
     document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.hasAttribute('data-build-nav')));
@@ -131,7 +132,7 @@ function eventLabel(event) {
     'task.completed': title ? `Completed task: ${title}` : 'Completed a task',
     'task.updated': title ? `Updated task: ${title}` : 'Updated a task',
     'task.deleted': title ? `Deleted task: ${title}` : 'Deleted a task',
-    'note.created': title ? `Created note: ${title}` : 'Created a note',
+    'note.created': title ? `Created ${event.payload?.noteType || 'note'}: ${title}` : 'Created a note',
     'note.updated': title ? `Updated note: ${title}` : 'Updated a note',
     'note.archived': title ? `Archived note: ${title}` : 'Archived a note',
     'note.restored': title ? `Restored note: ${title}` : 'Restored a note',
@@ -149,7 +150,7 @@ function taskRow(task, project) {
     </div>
     <div class="build-task-actions">
       <button class="text-button" type="button" data-action="edit-task" data-task-id="${escapeHtml(task.taskId)}">Edit</button>
-      ${task.status !== 'completed' && task.status !== 'cancelled' ? `<button class="text-button" type="button" data-action="complete-task" data-task-id="${escapeHtml(task.taskId)}">Complete</button>` : ''}
+      ${task.status !== 'completed' && task.status !== 'cancelled' ? `<button class="text-button" type="button" data-action="complete-task" data-task-id="${escapeHtml(task.taskId)}">Complete</button><button class="text-button" type="button" data-action="cancel-task" data-task-id="${escapeHtml(task.taskId)}">Cancel</button>` : ''}
       ${selected ? '<span class="build-next-label">NEXT</span>' : task.status !== 'completed' && task.status !== 'cancelled' ? `<button class="text-button" type="button" data-action="set-next" data-task-id="${escapeHtml(task.taskId)}">Set next</button>` : ''}
     </div>
   </article>`;
@@ -164,6 +165,7 @@ async function renderProjectDetail(projectId) {
   }
   currentProjectId = projectId;
   const tasks = await repository.listTasks({ projectId });
+  const notes = await repository.listNotes({ projectId, status: 'active' });
   const events = await repository.queryProjectActivity(projectId, { limit: 200 });
   projectsById.set(project.projectId, project);
   const nextAction = tasks.find(task => task.taskId === project.nextActionId);
@@ -182,6 +184,9 @@ async function renderProjectDetail(projectId) {
     <section class="build-panel"><div class="build-panel-heading"><div><div class="eyebrow">BLOCKERS</div><h2>${project.blockers.length ? `${project.blockers.length} to resolve` : 'No blockers'}</h2></div><button class="text-button" type="button" data-action="edit-blockers">Edit</button></div>${project.blockers.length ? `<ul class="build-blockers">${project.blockers.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '<p class="build-prose">Nothing is blocking progress right now.</p>'}</section>
     <section class="build-panel build-resources-panel"><div class="build-panel-heading"><div><div class="eyebrow">RESOURCES</div><h2>Links <span class="build-count">${project.resources.length}</span></h2></div><button class="secondary-button" type="button" data-action="new-resource">＋ Add link</button></div>
       ${project.resources.length ? `<ul class="build-resource-list">${project.resources.map(resource => `<li><a href="${escapeHtml(resource.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(resource.title)}</a><span class="build-resource-actions"><button class="text-button" type="button" data-action="edit-resource" data-resource-id="${escapeHtml(resource.resourceId)}">Edit</button><button class="text-button" type="button" data-action="remove-resource" data-resource-id="${escapeHtml(resource.resourceId)}">Remove</button></span></li>`).join('')}</ul>` : '<p class="build-prose">Add repository, design, deployment, or reference links.</p>'}
+    </section>
+    <section class="build-panel"><div class="build-panel-heading"><div><div class="eyebrow">THINK · NOTES</div><h2>Project thoughts <span class="build-count">${notes.length}</span></h2></div><button class="secondary-button" type="button" data-action="new-project-note">＋ Add note</button></div>
+      ${notes.length ? `<ul class="build-resource-list">${notes.map(note => `<li><button class="build-note-link" type="button" data-open-note="${escapeHtml(note.noteId)}"><b>${escapeHtml(note.title)}</b><small>${escapeHtml(note.type)} · Updated ${escapeHtml(formatDate(note.updatedAt))}</small></button><button class="text-button" type="button" data-action="edit-project-note" data-note-id="${escapeHtml(note.noteId)}">Edit</button></li>`).join('')}</ul>` : '<p class="build-prose">Capture a project thought without leaving this workspace.</p>'}
     </section>
     <section class="build-panel build-tasks-panel"><div class="build-panel-heading"><div><div class="eyebrow">PROJECT TASKS</div><h2>Tasks <span class="build-count">${tasks.length}</span></h2></div><button class="secondary-button" type="button" data-action="new-task">＋ Add Task</button></div>
       ${tasks.length ? `<div class="build-task-list">${tasks.map(task => taskRow(task, project)).join('')}</div>` : '<p class="build-prose">No tasks yet. Add the first concrete step when you are ready.</p>'}
@@ -293,10 +298,23 @@ document.addEventListener('click', event => {
     perform(() => renderProjectDetail(currentProjectId));
     return;
   }
+  const noteButton = event.target.closest('[data-open-note]');
+  if (noteButton) {
+    document.dispatchEvent(new CustomEvent('mohit-os:open-note', { detail: { noteId: noteButton.dataset.openNote } }));
+    return;
+  }
   const actionButton = event.target.closest('[data-action]');
   if (!actionButton) return;
   const actionName = actionButton.dataset.action;
   if (actionName === 'close-dialog') return closeDialogs();
+  if (actionName === 'new-project-note') {
+    document.dispatchEvent(new CustomEvent('mohit-os:quick-note', { detail: { projectId: currentProjectId } }));
+    return;
+  }
+  if (actionName === 'edit-project-note') {
+    document.dispatchEvent(new CustomEvent('mohit-os:open-note', { detail: { noteId: actionButton.dataset.noteId } }));
+    return;
+  }
   if (actionName === 'new-project') return openDialog('project-dialog');
   if (actionName === 'back-projects') {
     location.hash = 'build-projects';
@@ -332,6 +350,7 @@ document.addEventListener('click', event => {
   }
   if (actionName === 'remove-resource') return perform(async () => { await actions.removeProjectResource(currentProjectId, actionButton.dataset.resourceId); });
   if (actionName === 'complete-task') return perform(async () => { await actions.completeTask(actionButton.dataset.taskId, { sourceModule: SOURCE_MODULE }); });
+  if (actionName === 'cancel-task') return perform(async () => { await actions.updateTask(actionButton.dataset.taskId, { status: 'cancelled', sourceModule: SOURCE_MODULE }); });
   if (actionName === 'set-next') return perform(async () => { await actions.setProjectNextAction(currentProjectId, actionButton.dataset.taskId); });
   if (actionName === 'edit-task') {
     repository.getTask(actionButton.dataset.taskId).then(task => {
@@ -349,6 +368,13 @@ document.addEventListener('click', event => {
       openDialog('task-dialog');
     }).catch(showError);
   }
+});
+
+document.addEventListener('mohit-os:open-project', event => {
+  currentProjectId = event.detail.projectId;
+  setArea('build');
+  location.hash = `build-project/${encodeURIComponent(currentProjectId)}`;
+  perform(() => renderProjectDetail(currentProjectId));
 });
 
 document.addEventListener('change', event => {

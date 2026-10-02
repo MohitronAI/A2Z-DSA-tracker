@@ -14,11 +14,11 @@ MOHIT.OS is a personal learning and creation space. Its active areas are **LEARN
 - Install the app as a PWA on Android or desktop. The service worker caches the application shell; streaming YouTube videos still requires internet.
 - Export and import a progress backup from Settings.
 
-BUILD provides local project and task tracking, descriptions/current state, optional review dates, and editable project resource links. THINK provides searchable, taggable notes that can be linked to a project, archived, restored, or deleted. PLAN provides project-linked tasks with priority, status, and optional due/reminder date-time; due dates are data only and do not trigger notifications. ACTIVITY shows recent structured changes across these modules. The roadmap has no day schedule, prerequisite locking, or separate practice-problem tracker. Video links point directly to YouTube; lessons without a verified direct video remain individually marked in the app.
+BUILD provides local project and task tracking, descriptions/current state, optional review dates, editable project resource links, project-linked notes, and task operations. THINK provides searchable Note, Idea, Learning, and Decision captures that can be linked to a project, filtered, archived, restored, or deleted. PLAN provides project-linked tasks with priority, status, and Today/Upcoming/All views; due dates are data only and do not trigger notifications. ACTIVITY shows recent structured changes and supports source/text filtering. Global search groups matches from projects, notes, tasks, and Activity. The roadmap has no day schedule, prerequisite locking, or separate practice-problem tracker. Video links point directly to YouTube; lessons without a verified direct video remain individually marked in the app.
 
 ## MOHIT.OS Foundation storage
 
-The app initializes a separate, local-only IndexedDB database named `mohit-os-foundation` (database version 3). The version-1 `activityEvents` store and version-2 `projects`, `tasks`, and `foundationMeta` stores are preserved. Version 3 adds `notes`, adds a due-date index to tasks, and safely backfills project descriptions/resources. The ActivityEvent store uses `eventId` as its key and indexes `occurredAt`, `sourceModule`, and the compound subject type/ID. The A2Z tracker does not read from or write to this database.
+The app initializes a separate, local-only IndexedDB database named `mohit-os-foundation` (database version 4). Existing stores and records from versions 1–3 are preserved. Version 3 added `notes` and a due-date index to tasks; version 4 indexes notes by type and backfills existing notes as `Note`. The ActivityEvent store uses `eventId` as its key and indexes `occurredAt`, `sourceModule`, and the compound subject type/ID. The A2Z tracker does not read from or write to this database.
 
 The browser module `src/foundation/repository.mjs` exports `createFoundationRepository()`, which provides ActivityEvent, project/resource, task, and note repositories. `open()` initializes storage and returns database name/version metadata without exposing the raw IndexedDB connection. `appendEvent` is append-only and first-write-wins for duplicate event IDs; event query results are ordered by occurrence time, recorded time, then event ID. Storage initialization failures are reported in the console and do not block the existing tracker.
 
@@ -30,9 +30,9 @@ Projects capture name, description, status, importance, current state, blockers,
 
 ## THINK · Notes and PLAN · Tasks
 
-Notes store title, content, created/updated times, optional project association, tags, and active/archived state. PLAN reuses the shared Foundation task store rather than introducing a separate calendar or reminder system. Due/reminder dates are stored as task metadata only.
+Notes store type, title, content, created/updated times, optional project association, tags, and active/archived state. PLAN reuses the shared Foundation task store rather than introducing a separate calendar or reminder system. Due/reminder dates are stored as task metadata only.
 
-`src/foundation/actions.mjs` exposes a small structured action service for projects, tasks, notes, reminders-as-dated-tasks, search, activity queries, and read-only A2Z progress queries. UI modules use these operations; no AI or chatbot is included.
+`src/foundation/actions.mjs` exposes a small structured action service for reading and listing projects, tasks, and notes; project resources; task and note mutations; reminders-as-dated-tasks; grouped search; Activity queries; and read-only A2Z progress queries. UI modules use these operations; no AI or chatbot is included.
 
 All BUILD/THINK/PLAN data is local to the browser origin and is not synchronized to Supabase. No notifications, calendar integration, autonomous monitoring, or A2Z activity adapter is implemented.
 

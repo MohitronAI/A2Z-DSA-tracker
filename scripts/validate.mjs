@@ -9,6 +9,7 @@ import {
   NOTE_STORE_NAME,
   PROJECT_STORE_NAME,
   TASK_STORE_NAME,
+  NOTE_TYPES,
   buildRepositoryContract,
   createFoundationRepository,
   matchesActivityQuery,
@@ -256,7 +257,7 @@ await recordCheck('sync merge contract', () => {
 
 await recordCheck('MOHIT.OS Foundation schema and ActivityEvent contract', () => {
   assert(FOUNDATION_DATABASE_NAME === 'mohit-os-foundation', `Unexpected Foundation database name: ${FOUNDATION_DATABASE_NAME}`);
-  assert(FOUNDATION_DATABASE_VERSION === 3, `Expected Foundation database version 3, found ${FOUNDATION_DATABASE_VERSION}`);
+  assert(FOUNDATION_DATABASE_VERSION === 4, `Expected Foundation database version 4, found ${FOUNDATION_DATABASE_VERSION}`);
   assert(ACTIVITY_EVENT_SCHEMA_VERSION === 1, `Expected ActivityEvent schema version 1, found ${ACTIVITY_EVENT_SCHEMA_VERSION}`);
 
   const event = validateActivityEvent({
@@ -320,8 +321,15 @@ await recordCheck('MOHIT.OS Foundation schema and ActivityEvent contract', () =>
   );
 });
 
+await recordCheck('Foundation v4 schema and note-type migration', async () => {
+  assert(FOUNDATION_DATABASE_VERSION === 4, `Expected Foundation database version 4, found ${FOUNDATION_DATABASE_VERSION}`);
+  assert(NOTE_TYPES.join(',') === 'Note,Idea,Learning,Decision', `Unexpected note types: ${NOTE_TYPES.join(', ')}`);
+  const source = await fs.readFile(path.join(rootDir, 'src', 'foundation', 'repository.mjs'), 'utf8');
+  assert(source.includes("createIndex('byType', 'type'"), 'Foundation v4 must index notes by type');
+  assert(source.includes("note.type = 'Note'"), 'Foundation v4 must backfill existing notes as Note');
+});
+
 await recordCheck('BUILD V0 record and repository contracts', () => {
-  assert(FOUNDATION_DATABASE_VERSION === 3, `Expected Foundation database version 3, found ${FOUNDATION_DATABASE_VERSION}`);
   assert(PROJECT_STORE_NAME === 'projects', `Unexpected Project store: ${PROJECT_STORE_NAME}`);
   assert(TASK_STORE_NAME === 'tasks', `Unexpected Task store: ${TASK_STORE_NAME}`);
   assert(NOTE_STORE_NAME === 'notes', `Unexpected Note store: ${NOTE_STORE_NAME}`);
@@ -409,6 +417,7 @@ await recordCheck('BUILD V0 record and repository contracts', () => {
 
   const note = validateNoteRecord({
     noteId: 'note-check',
+    type: 'Idea',
     title: 'Validation note',
     content: 'Keep structured context with a project.',
     createdAt: timestamp,
@@ -419,6 +428,11 @@ await recordCheck('BUILD V0 record and repository contracts', () => {
     archivedAt: null
   });
   assert(note.tags.length === 2 && note.tags[1] === 'project', 'Note tags should be trimmed and deduplicated');
+  assert(note.type === 'Idea', 'Note type was not preserved');
+  assert(NOTE_TYPES.every(type => validateNoteRecord({ ...note, type }).type === type), 'Every supported note type should be accepted');
+  let invalidNoteTypeRejected = false;
+  try { validateNoteRecord({ ...note, type: 'Capture' }); } catch { invalidNoteTypeRejected = true; }
+  assert(invalidNoteTypeRejected, 'Unsupported note type should be rejected');
   assert(note.projectId === project.projectId, 'Note project reference was not preserved');
   let invalidNoteRejected = false;
   try { validateNoteRecord({ ...note, status: 'deleted' }); } catch { invalidNoteRejected = true; }
@@ -432,6 +446,8 @@ await recordCheck('MOHIT.OS action service contracts', async () => {
   const calls = [];
   const fakeRepository = {
     getProject: async projectId => ({ projectId }),
+    getTask: async taskId => ({ taskId }),
+    getNote: async noteId => ({ noteId }),
     createProject: async input => input,
     updateProject: async (projectId, changes) => ({ projectId, ...changes }),
     addProjectResource: async (projectId, input) => ({ projectId, input }),
@@ -443,7 +459,6 @@ await recordCheck('MOHIT.OS action service contracts', async () => {
     deleteTask: async taskId => ({ taskId }),
     setProjectNextAction: async (projectId, taskId) => ({ projectId, taskId }),
     createNote: async input => input,
-    getNote: async noteId => ({ noteId }),
     listNotes: async () => [],
     updateNote: async (noteId, changes) => ({ noteId, ...changes }),
     archiveNote: async noteId => ({ noteId, status: 'archived' }),
@@ -458,7 +473,15 @@ await recordCheck('MOHIT.OS action service contracts', async () => {
       updatedAt: '2026-10-02T10:00:00.000Z'
     }],
     listTasks: async () => [],
-    queryEvents: async options => options
+    queryEvents: async () => [{
+      eventId: 'event-search',
+      type: 'project.created',
+      occurredAt: '2026-10-02T10:00:00.000Z',
+      sourceModule: 'build.projects',
+      subject: { type: 'project', id: 'project-search' },
+      relatedEntities: [],
+      payload: { name: 'VisionGuide' }
+    }]
   };
   const storageCalls = [];
   const storage = {
@@ -477,7 +500,11 @@ await recordCheck('MOHIT.OS action service contracts', async () => {
   const reminder = await actions.createReminder({ title: 'Review', remindAt: '2026-10-05T10:00:00.000Z' });
   assert(reminder.dueAt === '2026-10-05T10:00:00.000Z' && reminder.sourceModule === 'plan.tasks', 'Reminder should map to a due-dated PLAN task');
   const searchResults = await actions.search('vision');
-  assert(searchResults.length === 1 && searchResults[0].type === 'project', 'Structured cross-entity search should return matching projects');
+  assert(searchResults.some(result => result.type === 'project') && searchResults.some(result => result.type === 'activity'), 'Cross-module search should return matching projects and activity');
+  const groupedSearch = await actions.searchOS('vision');
+  assert(groupedSearch.projects.length === 1 && groupedSearch.activity.length === 1, 'Global search should group matching projects and activity');
+  assert(await actions.readTask('task-search') instanceof Object, 'readTask action should return its structured record');
+  assert(await actions.readNote('note-search') instanceof Object, 'readNote action should return its structured record');
   const a2z = await actions.queryA2ZProgress();
   assert(a2z.schemaVersion === 2 && a2z.progress['lesson-1'].completed, 'A2Z progress query should return sanitized read-only progress');
   assert(!JSON.stringify(a2z).includes('must-not-be-returned'), 'A2Z query must not expose unrelated localStorage fields');
@@ -492,6 +519,10 @@ await recordCheck('MOHIT.OS cross-module dialog IDs', async () => {
   assert(buildSource.includes('id="task-dialog"'), 'BUILD task dialog should retain its module-specific ID');
   assert(osSource.includes('id="plan-task-dialog"'), 'PLAN task dialog must use a distinct ID from BUILD');
   assert(!osSource.includes('id="task-dialog"'), 'PLAN must not duplicate the BUILD task dialog ID');
+  const html = await fs.readFile(path.join(rootDir, 'index.html'), 'utf8');
+  assert(html.includes('id="os-search-dialog"'), 'Global search dialog should be present');
+  assert(html.includes('class="os-mobile-area-nav"'), 'Mobile area navigation should be present');
+  assert(osSource.includes("data-plan-view") && osSource.includes('data-note-type-filter'), 'PLAN and THINK filters should be wired');
 });
 
 if (failures.length > 0) {

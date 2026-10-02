@@ -1,5 +1,5 @@
 export const FOUNDATION_DATABASE_NAME = 'mohit-os-foundation';
-export const FOUNDATION_DATABASE_VERSION = 3;
+export const FOUNDATION_DATABASE_VERSION = 4;
 export const ACTIVITY_STORE_NAME = 'activityEvents';
 export const ACTIVITY_EVENT_SCHEMA_VERSION = 1;
 export const PROJECT_STORE_NAME = 'projects';
@@ -18,6 +18,8 @@ const THINK_SOURCE_MODULE = 'think.notes';
 const PLAN_SOURCE_MODULE = 'plan.tasks';
 const DEVICE_ID_KEY = 'deviceId';
 const NOTE_STATUSES = new Set(['active', 'archived']);
+export const NOTE_TYPES = Object.freeze(['Note', 'Idea', 'Learning', 'Decision']);
+const NOTE_TYPE_SET = new Set(NOTE_TYPES);
 
 function isPlainObject(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -120,6 +122,7 @@ function validateProjectResource(resource, index = 0) {
 export function validateNoteRecord(note) {
   if (!isPlainObject(note)) throw new TypeError('Note must be a plain object.');
   if (!NOTE_STATUSES.has(note.status)) throw new TypeError(`Note status is invalid: ${note.status}`);
+  if (!NOTE_TYPE_SET.has(note.type)) throw new TypeError(`Note type is invalid: ${note.type}`);
   const title = requireNonEmptyString(note.title, 'title');
   if (typeof note.content !== 'string') throw new TypeError('Note content must be a string.');
   if (!Array.isArray(note.tags) || note.tags.some(tag => typeof tag !== 'string' || !tag.trim())) {
@@ -133,6 +136,7 @@ export function validateNoteRecord(note) {
   }
   const normalized = {
     noteId: requireNonEmptyString(note.noteId, 'noteId'),
+    type: note.type,
     title,
     content: note.content,
     createdAt: normalizeTimestamp(note.createdAt, 'createdAt'),
@@ -341,6 +345,17 @@ export function createFoundationRepository({
           notes.createIndex('byStatus', 'status', { unique: false });
           notes.createIndex('byUpdatedAt', 'updatedAt', { unique: false });
         }
+        const notes = request.transaction.objectStore(NOTE_STORE_NAME);
+        if (!notes.indexNames.contains('byType')) notes.createIndex('byType', 'type', { unique: false });
+        const noteCursorRequest = notes.openCursor();
+        noteCursorRequest.onsuccess = () => {
+          const cursor = noteCursorRequest.result;
+          if (!cursor) return;
+          const note = cursor.value;
+          if (!NOTE_TYPE_SET.has(note.type)) note.type = 'Note';
+          cursor.update(note);
+          cursor.continue();
+        };
         const projects = request.transaction.objectStore(PROJECT_STORE_NAME);
         const projectCursorRequest = projects.openCursor();
         projectCursorRequest.onsuccess = () => {
@@ -805,7 +820,12 @@ export function createFoundationRepository({
           }
           const write = project => {
             tasks.put(updated);
-            if (project) projects.put({ ...project, updatedAt: now, lastActivityAt: now });
+            if (project) {
+              const nextActionId = project.nextActionId === taskId && ['completed', 'cancelled'].includes(updated.status)
+                ? null
+                : project.nextActionId;
+              projects.put(validateProjectRecord({ ...project, nextActionId, updatedAt: now, lastActivityAt: now }));
+            }
             const type = updated.status === 'completed' && current.status !== 'completed' ? 'task.completed' : 'task.updated';
             activity.add(createActivityEvent(deviceId, type, { type: 'task', id: taskId }, { title: updated.title, status: updated.status, changes: changedFields }, updated.projectId ? [{ type: 'project', id: updated.projectId }] : [], sourceModule));
           };
@@ -963,6 +983,7 @@ export function createFoundationRepository({
       createdAt: now,
       updatedAt: now,
       projectId: input.projectId ?? null,
+      type: input.type ?? 'Note',
       tags: input.tags ?? [],
       status: 'active',
       archivedAt: null
@@ -975,7 +996,7 @@ export function createFoundationRepository({
       const notes = transaction.objectStore(NOTE_STORE_NAME);
       const save = project => {
         notes.add(note);
-        transaction.objectStore(STORE_NAME).add(createActivityEvent(deviceId, 'note.created', { type: 'note', id: noteId }, { title: note.title }, note.projectId ? [{ type: 'project', id: note.projectId }] : [], THINK_SOURCE_MODULE));
+        transaction.objectStore(STORE_NAME).add(createActivityEvent(deviceId, 'note.created', { type: 'note', id: noteId }, { title: note.title, noteType: note.type }, note.projectId ? [{ type: 'project', id: note.projectId }] : [], THINK_SOURCE_MODULE));
         if (project) transaction.objectStore(PROJECT_STORE_NAME).put({ ...project, updatedAt: now, lastActivityAt: now });
       };
       if (!note.projectId) save(null);
@@ -1003,15 +1024,16 @@ export function createFoundationRepository({
   }
 
   async function listNotes(options = {}) {
-    const { projectId } = options;
+    const { projectId, type } = options;
     const status = Object.hasOwn(options, 'status') ? options.status : 'active';
+    if (type !== undefined && !NOTE_TYPE_SET.has(type)) throw new TypeError(`Note type is invalid: ${type}`);
     const db = await openDatabase();
     const store = db.transaction(NOTE_STORE_NAME, 'readonly').objectStore(NOTE_STORE_NAME);
     const notes = projectId === undefined
       ? await requestResult(store.getAll())
       : await requestResult(store.index('byProjectId').getAll(projectId));
     return notes
-      .filter(note => status === undefined || note.status === status)
+      .filter(note => (status === undefined || note.status === status) && (type === undefined || note.type === type))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.noteId.localeCompare(b.noteId));
   }
 
@@ -1046,7 +1068,7 @@ export function createFoundationRepository({
             const eventType = current.status !== updated.status
               ? updated.status === 'archived' ? 'note.archived' : 'note.restored'
               : 'note.updated';
-            activity.add(createActivityEvent(deviceId, eventType, { type: 'note', id: noteId }, { title: updated.title, changes: changedFields }, updated.projectId ? [{ type: 'project', id: updated.projectId }] : [], THINK_SOURCE_MODULE));
+            activity.add(createActivityEvent(deviceId, eventType, { type: 'note', id: noteId }, { title: updated.title, noteType: updated.type, changes: changedFields }, updated.projectId ? [{ type: 'project', id: updated.projectId }] : [], THINK_SOURCE_MODULE));
           };
           if (updated.projectId) {
             const projectRequest = projects.get(updated.projectId);

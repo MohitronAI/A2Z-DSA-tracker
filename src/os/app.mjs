@@ -22,9 +22,15 @@ let repository = null;
 let actions = null;
 let currentArea = 'learn';
 let showArchivedNotes = false;
-let showAllTasks = false;
 let noteSearch = '';
+let noteTypeFilter = 'all';
+let noteProjectFilter = 'all';
+let planView = 'all';
+let showClosedTasks = false;
+let activitySearch = '';
+let activitySource = 'all';
 let waiting = false;
+let globalSearchGeneration = 0;
 
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -62,6 +68,7 @@ function setArea(area) {
       if (active) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     });
+
     return;
   }
   document.querySelectorAll('.page').forEach(page => page.classList.toggle('active', page === pages[area]));
@@ -91,8 +98,48 @@ function setArea(area) {
   if (area !== 'learn') location.hash = area;
 }
 
+document.addEventListener('keydown', event => {
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'k') {
+    event.preventDefault();
+    openGlobalSearch();
+  }
+});
+
+document.addEventListener('mohit-os:quick-note', async event => {
+  const { projectId = null, type = 'Note' } = event.detail || {};
+  showArchivedNotes = false;
+  noteTypeFilter = 'all';
+  noteProjectFilter = 'all';
+  noteSearch = '';
+  setArea('think');
+  await refreshArea();
+  const form = document.querySelector('#note-dialog form');
+  delete form.dataset.noteId;
+  form.reset();
+  form.elements.type.value = type;
+  form.elements.projectId.value = projectId || '';
+  form.querySelector('[data-dialog-title]').textContent = 'New capture';
+  openDialog('note-dialog');
+  form.elements.title.focus();
+});
+
+document.addEventListener('mohit-os:open-note', async event => {
+  try {
+    setArea('think');
+    await refreshArea();
+    const note = await actions.readNote(event.detail.noteId);
+    if (!note) throw new Error(`Note not found: ${event.detail.noteId}`);
+    const form = document.querySelector('#note-dialog form');
+    form.reset();
+    noteToForm(note);
+    openDialog('note-dialog');
+  } catch (error) {
+    message(roots.think, error.message || 'Could not open this note.', true);
+  }
+});
+
 async function renderProjectsForSelect(selected = null) {
-  const projects = await repository.listProjects();
+  const projects = await repository.listProjects({ includeArchived: true });
   return `<option value="">No project</option>${projects.map(project => `<option value="${escapeHtml(project.projectId)}" ${selected === project.projectId ? 'selected' : ''}>${escapeHtml(project.name)}</option>`).join('')}`;
 }
 
@@ -107,20 +154,23 @@ async function renderThink() {
   if (!actions) return;
   const notes = await repository.listNotes({ status: showArchivedNotes ? 'archived' : 'active' });
   const term = noteSearch.trim().toLocaleLowerCase();
-  const filtered = notes.filter(note => !term || `${note.title} ${note.content} ${note.tags.join(' ')}`.toLocaleLowerCase().includes(term));
+  const filtered = notes.filter(note => (noteTypeFilter === 'all' || note.type === noteTypeFilter)
+    && (noteProjectFilter === 'all' || note.projectId === noteProjectFilter)
+    && (!term || `${note.title} ${note.content} ${note.tags.join(' ')}`.toLocaleLowerCase().includes(term)));
   const projects = await repository.listProjects({ includeArchived: true });
   const projectNames = new Map(projects.map(project => [project.projectId, project.name]));
-  roots.think.innerHTML = `<div class="os-heading-row"><div><div class="eyebrow">THINK · NOTES</div><h1 id="think-heading">Notes &amp; ideas</h1><p class="subtitle">Capture thoughts and connect them to a project when useful.</p></div><button class="primary-button" type="button" data-os-action="new-note">＋ New note</button></div>
+  roots.think.innerHTML = `<div class="os-heading-row"><div><div class="eyebrow">THINK · NOTES</div><h1 id="think-heading">Notes &amp; ideas</h1><p class="subtitle">Capture thoughts and connect them to a project when useful.</p></div><div class="os-capture-actions">${['Note', 'Idea', 'Learning', 'Decision'].map(type => `<button class="secondary-button" type="button" data-os-action="new-note" data-note-type="${type}">＋ ${type}</button>`).join('')}</div></div>
     <p class="os-feedback" data-os-message role="status"></p>
-    <div class="os-toolbar"><label class="os-search">Search notes<input type="search" data-note-search value="${escapeHtml(noteSearch)}" placeholder="Title, content, or tag"></label><button class="secondary-button" type="button" data-os-action="toggle-notes">${showArchivedNotes ? 'Show active notes' : 'Show archived'}</button></div>
-    <section class="os-record-list" aria-label="Notes">${filtered.length ? filtered.map(note => `<article class="os-record-card"><div class="os-record-heading"><div><h2>${escapeHtml(note.title)}</h2><small>Updated ${escapeHtml(displayDate(note.updatedAt))}${note.projectId ? ` · ${escapeHtml(projectNames.get(note.projectId) || 'Project unavailable')}` : ''}</small></div><div class="os-record-actions">${note.status === 'active' ? `<button class="text-button" type="button" data-os-action="edit-note" data-note-id="${escapeHtml(note.noteId)}">Edit</button><button class="text-button" type="button" data-os-action="archive-note" data-note-id="${escapeHtml(note.noteId)}">Archive</button>` : `<button class="text-button" type="button" data-os-action="restore-note" data-note-id="${escapeHtml(note.noteId)}">Restore</button>`}<button class="text-button" type="button" data-os-action="delete-note" data-note-id="${escapeHtml(note.noteId)}">Delete</button></div></div><p class="os-record-content">${escapeHtml(note.content || 'No content yet.')}</p>${note.tags.length ? `<div class="os-tags">${note.tags.map(tag => `<span>${escapeHtml(tag)}</span>`).join('')}</div>` : ''}</article>`).join('') : `<div class="os-empty"><h2>${term ? 'No matching notes.' : showArchivedNotes ? 'No archived notes.' : 'No notes yet.'}</h2><p>Use a note to capture an idea, decision, or project thought.</p></div>`}</section>
-    <dialog class="os-dialog" id="note-dialog"><form data-os-form="note"><div class="os-dialog-heading"><h2 data-dialog-title>New note</h2><button class="build-icon-button" type="button" data-os-action="close-dialog" aria-label="Close">×</button></div><label>Title<input name="title" required maxlength="160" placeholder="A useful, searchable title"></label><label>Note<textarea name="content" rows="7" maxlength="10000" placeholder="Capture the thought…"></textarea></label><label>Related project<select name="projectId">${await renderProjectsForSelect()}</select></label><label>Tags <span class="build-field-hint">Comma-separated</span><input name="tags" maxlength="500" placeholder="idea, research"></label><div class="build-dialog-actions"><button class="secondary-button" type="button" data-os-action="close-dialog">Cancel</button><button class="primary-button" type="submit">Save note</button></div></form></dialog>`;
+    <div class="os-toolbar os-filter-toolbar"><label class="os-search">Search notes<input type="search" data-note-search value="${escapeHtml(noteSearch)}" placeholder="Title, content, or tag"></label><label>Type<select data-note-type-filter><option value="all">All types</option>${['Note', 'Idea', 'Learning', 'Decision'].map(type => `<option value="${type}" ${noteTypeFilter === type ? 'selected' : ''}>${type}</option>`).join('')}</select></label><label>Project<select data-note-project-filter><option value="all">All projects</option>${projects.map(project => `<option value="${escapeHtml(project.projectId)}" ${noteProjectFilter === project.projectId ? 'selected' : ''}>${escapeHtml(project.name)}</option>`).join('')}</select></label><button class="secondary-button" type="button" data-os-action="toggle-notes">${showArchivedNotes ? 'Show active' : 'Show archived'}</button></div>
+    <section class="os-record-list" aria-label="Notes">${filtered.length ? filtered.map(note => `<article class="os-record-card" id="note-${escapeHtml(note.noteId)}" data-note-id="${escapeHtml(note.noteId)}"><div class="os-record-heading"><div><span class="build-badge">${escapeHtml(note.type)}</span><h2>${escapeHtml(note.title)}</h2><small>Updated ${escapeHtml(displayDate(note.updatedAt))}${note.projectId ? ` · ${escapeHtml(projectNames.get(note.projectId) || 'Project unavailable')}` : ''}</small></div><div class="os-record-actions">${note.status === 'active' ? `<button class="text-button" type="button" data-os-action="edit-note" data-note-id="${escapeHtml(note.noteId)}">Edit</button><button class="text-button" type="button" data-os-action="archive-note" data-note-id="${escapeHtml(note.noteId)}">Archive</button>` : `<button class="text-button" type="button" data-os-action="restore-note" data-note-id="${escapeHtml(note.noteId)}">Restore</button>`}<button class="text-button" type="button" data-os-action="delete-note" data-note-id="${escapeHtml(note.noteId)}">Delete</button></div></div><p class="os-record-content">${escapeHtml(note.content || 'No content yet.')}</p>${note.tags.length ? `<div class="os-tags">${note.tags.map(tag => `<span>${escapeHtml(tag)}</span>`).join('')}</div>` : ''}</article>`).join('') : `<div class="os-empty"><h2>${term || noteTypeFilter !== 'all' || noteProjectFilter !== 'all' ? 'No matching notes.' : showArchivedNotes ? 'No archived notes.' : 'No notes yet.'}</h2><p>Use a note to capture an idea, decision, or project thought.</p></div>`}</section>
+    <dialog class="os-dialog" id="note-dialog"><form data-os-form="note"><div class="os-dialog-heading"><h2 data-dialog-title>New capture</h2><button class="build-icon-button" type="button" data-os-action="close-dialog" aria-label="Close">×</button></div><label>Type<select name="type">${['Note', 'Idea', 'Learning', 'Decision'].map(type => `<option value="${type}">${type}</option>`).join('')}</select></label><label>Title<input name="title" required maxlength="160" placeholder="A useful, searchable title"></label><label>Content<textarea name="content" rows="7" maxlength="10000" placeholder="Capture the thought…"></textarea></label><label>Related project<select name="projectId">${await renderProjectsForSelect()}</select></label><label>Tags <span class="build-field-hint">Comma-separated</span><input name="tags" maxlength="500" placeholder="idea, research"></label><div class="build-dialog-actions"><button class="secondary-button" type="button" data-os-action="close-dialog">Cancel</button><button class="primary-button" type="submit">Save capture</button></div></form></dialog>`;
 }
 
 function noteToForm(note) {
   const form = document.querySelector('#note-dialog form');
   form.dataset.noteId = note.noteId;
   form.querySelector('[data-dialog-title]').textContent = 'Edit note';
+  form.elements.type.value = note.type;
   form.elements.title.value = note.title;
   form.elements.content.value = note.content;
   form.elements.projectId.value = note.projectId || '';
@@ -132,10 +182,23 @@ async function renderPlan() {
   const tasks = await repository.listTasks();
   const projects = await repository.listProjects({ includeArchived: true });
   const projectNames = new Map(projects.map(project => [project.projectId, project.name]));
-  const visibleTasks = showAllTasks ? tasks : tasks.filter(task => !['completed', 'cancelled'].includes(task.status));
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const visibleTasks = tasks.filter(task => {
+    const closed = ['completed', 'cancelled'].includes(task.status);
+    if (closed !== showClosedTasks) return false;
+    if (planView === 'all') return true;
+    if (!task.dueAt) return false;
+    const due = new Date(task.dueAt);
+    if (!Number.isFinite(due.getTime())) return false;
+    const dueKey = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}-${String(due.getDate()).padStart(2, '0')}`;
+    return planView === 'today' ? dueKey === todayKey : dueKey > todayKey;
+  }).sort((a, b) => (a.dueAt || '9999').localeCompare(b.dueAt || '9999')
+    || b.createdAt.localeCompare(a.createdAt)
+    || a.taskId.localeCompare(b.taskId));
   roots.plan.innerHTML = `<div class="os-heading-row"><div><div class="eyebrow">PLAN · TASKS</div><h1 id="plan-heading">Tasks &amp; reminders</h1><p class="subtitle">Keep the next concrete action visible. Due dates are stored locally; this version does not send notifications.</p></div><button class="primary-button" type="button" data-os-action="new-task">＋ New task</button></div>
-    <p class="os-feedback" data-os-message role="status"></p><div class="os-toolbar"><span class="os-muted">${visibleTasks.length} ${showAllTasks ? 'tasks' : 'open tasks'}</span><button class="secondary-button" type="button" data-os-action="toggle-tasks">${showAllTasks ? 'Show open tasks' : 'Show completed &amp; cancelled'}</button></div>
-    <section class="os-record-list" aria-label="Tasks">${visibleTasks.length ? visibleTasks.map(task => `<article class="os-record-card"><div class="os-record-heading"><div><h2>${escapeHtml(task.title)}</h2><small>${escapeHtml(task.status.replace('_', ' '))} · ${escapeHtml(task.priority)} priority${task.projectId ? ` · ${escapeHtml(projectNames.get(task.projectId) || 'Project unavailable')}` : ''} · Due ${escapeHtml(displayDate(task.dueAt))}</small></div><div class="os-record-actions"><button class="text-button" type="button" data-os-action="edit-task" data-task-id="${escapeHtml(task.taskId)}">Edit</button>${!['completed', 'cancelled'].includes(task.status) ? `<button class="text-button" type="button" data-os-action="complete-task" data-task-id="${escapeHtml(task.taskId)}">Complete</button><button class="text-button" type="button" data-os-action="cancel-task" data-task-id="${escapeHtml(task.taskId)}">Cancel</button>` : ''}<button class="text-button" type="button" data-os-action="delete-task" data-task-id="${escapeHtml(task.taskId)}">Delete</button></div></div>${task.completedAt ? `<p class="os-record-content">Completed ${escapeHtml(displayDate(task.completedAt))}</p>` : ''}</article>`).join('') : `<div class="os-empty"><h2>No ${showAllTasks ? 'tasks' : 'open tasks'}.</h2><p>Add a task when there is something you want to remember to do.</p></div>`}</section>
+    <p class="os-feedback" data-os-message role="status"></p><div class="os-toolbar os-filter-toolbar"><div class="os-view-tabs" role="group" aria-label="Task date view">${[['today', 'Today'], ['upcoming', 'Upcoming'], ['all', 'All']].map(([key, label]) => `<button class="secondary-button ${planView === key ? 'is-selected' : ''}" type="button" data-plan-view="${key}" aria-pressed="${planView === key}">${label}</button>`).join('')}</div><label class="os-closed-toggle"><input type="checkbox" data-show-closed ${showClosedTasks ? 'checked' : ''}> Completed &amp; cancelled</label><span class="os-muted">${visibleTasks.length} ${showClosedTasks ? 'completed or cancelled' : 'open'} ${planView === 'all' ? 'tasks' : `${planView} tasks`}</span></div>
+    <section class="os-record-list" aria-label="Tasks">${visibleTasks.length ? visibleTasks.map(task => `<article class="os-record-card" id="task-${escapeHtml(task.taskId)}" data-task-id="${escapeHtml(task.taskId)}"><div class="os-record-heading"><div><h2>${escapeHtml(task.title)}</h2><small>${escapeHtml(task.status.replace('_', ' '))} · ${escapeHtml(task.priority)} priority${task.projectId ? ` · ${escapeHtml(projectNames.get(task.projectId) || 'Project unavailable')}` : ''} · Due ${escapeHtml(displayDate(task.dueAt))}</small></div><div class="os-record-actions"><button class="text-button" type="button" data-os-action="edit-task" data-task-id="${escapeHtml(task.taskId)}">Edit</button>${!['completed', 'cancelled'].includes(task.status) ? `<button class="text-button" type="button" data-os-action="complete-task" data-task-id="${escapeHtml(task.taskId)}">Complete</button><button class="text-button" type="button" data-os-action="cancel-task" data-task-id="${escapeHtml(task.taskId)}">Cancel</button>` : ''}<button class="text-button" type="button" data-os-action="delete-task" data-task-id="${escapeHtml(task.taskId)}">Delete</button></div></div>${task.completedAt ? `<p class="os-record-content">Completed ${escapeHtml(displayDate(task.completedAt))}</p>` : ''}</article>`).join('') : `<div class="os-empty"><h2>No ${showClosedTasks ? 'completed or cancelled' : planView === 'all' ? 'open' : planView} tasks${planView !== 'all' && !showClosedTasks ? ' with a matching due date' : ''}.</h2><p>Add a task when there is something you want to remember to do.</p></div>`}</section>
     <dialog class="os-dialog" id="plan-task-dialog"><form data-os-form="task"><div class="os-dialog-heading"><h2 data-dialog-title>New task</h2><button class="build-icon-button" type="button" data-os-action="close-dialog" aria-label="Close">×</button></div><label>Task<input name="title" required maxlength="200" placeholder="A clear next action"></label><div class="build-form-row"><label>Priority<select name="priority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></label><label>Status<select name="status"><option value="todo">To do</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></label></div><label>Project<select name="projectId">${await renderProjectsForSelect()}</select></label><label>Due / reminder date &amp; time<input name="dueAt" type="datetime-local"></label><div class="build-dialog-actions"><button class="secondary-button" type="button" data-os-action="close-dialog">Cancel</button><button class="primary-button" type="submit">Save task</button></div></form></dialog>`;
 }
 
@@ -153,7 +216,10 @@ async function taskToForm(task) {
 async function renderActivity() {
   if (!actions) return;
   const events = (await actions.queryActivity({ limit: 1000 })).reverse();
-  roots.activity.innerHTML = `<div class="os-heading-row"><div><div class="eyebrow">MOHIT.OS · ACTIVITY</div><h1 id="activity-heading">Activity history</h1><p class="subtitle">A local timeline of meaningful project, task, and note changes.</p></div></div><section class="os-record-list" aria-label="Recent activity">${events.length ? events.map(event => `<article class="os-activity-row"><time datetime="${escapeHtml(event.occurredAt)}">${escapeHtml(displayDate(event.occurredAt))}</time><div><strong>${escapeHtml(eventLabel(event))}</strong><small>${escapeHtml(event.sourceModule)} · ${escapeHtml(event.subject.type)}</small></div></article>`).join('') : '<div class="os-empty"><h2>No activity yet.</h2><p>Meaningful actions in BUILD, THINK, and PLAN will appear here.</p></div>'}</section>`;
+  const term = activitySearch.trim().toLocaleLowerCase();
+  const filtered = events.filter(event => (activitySource === 'all' || event.sourceModule === activitySource)
+    && (!term || `${eventLabel(event)} ${event.sourceModule} ${event.subject.type} ${JSON.stringify(event.payload)}`.toLocaleLowerCase().includes(term)));
+  roots.activity.innerHTML = `<div class="os-heading-row"><div><div class="eyebrow">MOHIT.OS · ACTIVITY</div><h1 id="activity-heading">Activity history</h1><p class="subtitle">A local timeline of meaningful project, task, and note changes.</p></div></div><div class="os-toolbar os-filter-toolbar"><label class="os-search">Search activity<input type="search" data-activity-search value="${escapeHtml(activitySearch)}" placeholder="Project, task, note, or change"></label><label>Source<select data-activity-source><option value="all">All areas</option>${[['build.projects', 'BUILD'], ['think.notes', 'THINK'], ['plan.tasks', 'PLAN'], ['learn.a2z-dsa', 'LEARN · A2Z']].map(([source, title]) => `<option value="${source}" ${activitySource === source ? 'selected' : ''}>${title}</option>`).join('')}</select></label></div><section class="os-record-list" aria-label="Recent activity">${filtered.length ? filtered.map(event => `<article class="os-activity-row" data-event-id="${escapeHtml(event.eventId)}" id="activity-${escapeHtml(event.eventId)}"><time datetime="${escapeHtml(event.occurredAt)}">${escapeHtml(displayDate(event.occurredAt))}</time><div><strong>${escapeHtml(eventLabel(event))}</strong><small>${escapeHtml(event.sourceModule)} · ${escapeHtml(event.subject.type)}</small></div></article>`).join('') : `<div class="os-empty"><h2>${term || activitySource !== 'all' ? 'No matching activity.' : 'No activity yet.'}</h2><p>Meaningful actions in BUILD, THINK, and PLAN will appear here.</p></div>`}</section>`;
 }
 
 function eventLabel(event) {
@@ -171,7 +237,7 @@ function eventLabel(event) {
     'task.updated': `Task updated: ${event.payload.title}`,
     'task.completed': `Task completed: ${event.payload.title}`,
     'task.deleted': `Task deleted: ${event.payload.title}`,
-    'note.created': `Note created: ${event.payload.title}`,
+    'note.created': `${event.payload.noteType || 'Note'} created: ${event.payload.title}`,
     'note.updated': `Note updated: ${event.payload.title}`,
     'note.archived': `Note archived: ${event.payload.title}`,
     'note.restored': `Note restored: ${event.payload.title}`,
@@ -182,6 +248,62 @@ function eventLabel(event) {
 
 function openDialog(id) {
   document.getElementById(id)?.showModal();
+}
+
+function openGlobalSearch() {
+  const dialog = document.querySelector('#os-search-dialog');
+  if (!dialog.open) dialog.showModal();
+  const input = dialog.querySelector('[data-global-search]');
+  input.value = '';
+  dialog.querySelector('[data-search-results]').innerHTML = '<p class="os-muted">Search projects, notes, tasks, and activity.</p>';
+  input.focus();
+}
+
+function renderSearchGroups(groups) {
+  const definitions = [
+    ['projects', 'Projects'],
+    ['notes', 'Notes'],
+    ['tasks', 'Tasks'],
+    ['activity', 'Activity']
+  ];
+  const content = definitions.map(([key, title]) => {
+    const results = groups[key];
+    if (!results.length) return '';
+    return `<section class="os-search-group"><h3>${title} <span>${results.length}</span></h3>${results.map(result => `<button type="button" class="os-search-result" data-search-result="${escapeHtml(result.type)}" data-result-id="${escapeHtml(result.id)}"><strong>${escapeHtml(result.title)}</strong><small>${escapeHtml(result.subtitle || '')}</small></button>`).join('')}</section>`;
+  }).join('');
+  return content || '<p class="os-muted">No matching results.</p>';
+}
+
+async function navigateToSearchResult(resultType, resultId) {
+  const dialog = document.querySelector('#os-search-dialog');
+  dialog.close();
+  if (resultType === 'project') {
+    setArea('build');
+    document.dispatchEvent(new CustomEvent('mohit-os:open-project', { detail: { projectId: resultId } }));
+    return;
+  }
+
+  if (resultType === 'note') {
+    showArchivedNotes = false;
+    noteTypeFilter = 'all';
+    noteProjectFilter = 'all';
+    noteSearch = '';
+    setArea('think');
+    await refreshArea();
+    document.querySelector(`#note-${CSS.escape(resultId)}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else if (resultType === 'task') {
+    showClosedTasks = false;
+    planView = 'all';
+    setArea('plan');
+    await refreshArea();
+    document.querySelector(`#task-${CSS.escape(resultId)}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else if (resultType === 'activity') {
+    activitySearch = '';
+    activitySource = 'all';
+    setArea('activity');
+    await refreshArea();
+    document.querySelector(`#activity-${CSS.escape(resultId)}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 
 async function refreshArea() {
@@ -203,6 +325,22 @@ async function refreshArea() {
 }
 
 document.addEventListener('click', event => {
+  if (event.target.closest('[data-os-search-open]')) {
+    openGlobalSearch();
+    return;
+  }
+  const searchResult = event.target.closest('[data-search-result]');
+  if (searchResult) {
+    navigateToSearchResult(searchResult.dataset.searchResult, searchResult.dataset.resultId)
+      .catch(error => console.error('Could not open the selected search result.', error));
+    return;
+  }
+  const planViewButton = event.target.closest('[data-plan-view]');
+  if (planViewButton) {
+    planView = planViewButton.dataset.planView;
+    refreshArea();
+    return;
+  }
   const moduleButton = event.target.closest('[data-area-module]');
   if (moduleButton) {
     const area = moduleButton.dataset.areaModule;
@@ -235,7 +373,8 @@ document.addEventListener('click', event => {
     const form = document.querySelector('#note-dialog form');
     delete form.dataset.noteId;
     form.reset();
-    form.querySelector('[data-dialog-title]').textContent = 'New note';
+    form.elements.type.value = actionButton.dataset.noteType || 'Note';
+    form.querySelector('[data-dialog-title]').textContent = 'New capture';
     return openDialog('note-dialog');
   }
   if (action === 'new-task') {
@@ -247,10 +386,6 @@ document.addEventListener('click', event => {
   }
   if (action === 'toggle-notes') {
     showArchivedNotes = !showArchivedNotes;
-    return refreshArea();
-  }
-  if (action === 'toggle-tasks') {
-    showAllTasks = !showAllTasks;
     return refreshArea();
   }
   if (action === 'edit-note') {
@@ -279,14 +414,66 @@ document.addEventListener('click', event => {
 });
 
 document.addEventListener('input', event => {
-  if (!event.target.matches('[data-note-search]')) return;
-  noteSearch = event.target.value;
-  const start = event.target.selectionStart;
-  refreshArea().then(() => {
-    const input = roots.think.querySelector('[data-note-search]');
-    input?.focus();
-    input?.setSelectionRange(start, start);
-  });
+  if (event.target.matches('[data-note-search]')) {
+    noteSearch = event.target.value;
+    const start = event.target.selectionStart;
+    refreshArea().then(() => {
+      const input = roots.think.querySelector('[data-note-search]');
+      input?.focus();
+      input?.setSelectionRange(start, start);
+    });
+    return;
+  }
+  if (event.target.matches('[data-activity-search]')) {
+    activitySearch = event.target.value;
+    const start = event.target.selectionStart;
+    refreshArea().then(() => {
+      const input = roots.activity.querySelector('[data-activity-search]');
+      input?.focus();
+      input?.setSelectionRange(start, start);
+    });
+    return;
+  }
+  if (event.target.matches('[data-global-search]')) {
+    const query = event.target.value;
+    const generation = ++globalSearchGeneration;
+    if (!query.trim()) {
+      document.querySelector('[data-search-results]').innerHTML = '<p class="os-muted">Search projects, notes, tasks, and activity.</p>';
+      return;
+    }
+    if (!actions) {
+      document.querySelector('[data-search-results]').innerHTML = '<p class="os-feedback is-error" role="alert">Local MOHIT.OS storage is unavailable.</p>';
+      return;
+    }
+    actions.searchOS(query).then(groups => {
+      if (generation === globalSearchGeneration) {
+        document.querySelector('[data-search-results]').innerHTML = renderSearchGroups(groups);
+      }
+    }).catch(error => {
+      if (generation === globalSearchGeneration) {
+        document.querySelector('[data-search-results]').innerHTML = `<p class="os-feedback is-error" role="alert">${escapeHtml(error.message || 'Search failed.')}</p>`;
+      }
+    });
+  }
+});
+
+document.addEventListener('change', event => {
+  if (event.target.matches('[data-note-type-filter]')) {
+    noteTypeFilter = event.target.value;
+    refreshArea();
+  } else if (event.target.matches('[data-note-project-filter]')) {
+    noteProjectFilter = event.target.value;
+    refreshArea();
+  } else if (event.target.matches('[data-plan-view]')) {
+    planView = event.target.dataset.planView;
+    refreshArea();
+  } else if (event.target.matches('[data-show-closed]')) {
+    showClosedTasks = event.target.checked;
+    refreshArea();
+  } else if (event.target.matches('[data-activity-source]')) {
+    activitySource = event.target.value;
+    refreshArea();
+  }
 });
 
 document.addEventListener('submit', event => {
@@ -298,6 +485,7 @@ document.addEventListener('submit', event => {
     try {
       if (form.dataset.osForm === 'note') {
         const changes = {
+          type: data.get('type'),
           title: data.get('title'),
           content: data.get('content'),
           projectId: data.get('projectId') || null,
