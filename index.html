@@ -18,6 +18,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=mohit-os-20261002" />
+  <link rel="stylesheet" href="styles-build.css?v=build-20261003-5" />
 </head>
 <body>
   <div class="app-shell">
@@ -27,20 +28,26 @@
         <span><b>MOHIT.OS</b><small>Learn · Build · Think</small></span>
       </a>
       <nav class="os-areas" aria-label="MOHIT.OS areas">
-        <span class="os-area active" aria-current="page">LEARN</span>
-        <span class="os-area future" aria-label="BUILD, future area">BUILD <small>SOON</small></span>
+        <button class="os-area active" type="button" data-area-switch="learn" aria-current="page">LEARN</button>
+        <button class="os-area" type="button" data-build-nav>BUILD</button>
         <span class="os-area future" aria-label="THINK, future area">THINK <small>SOON</small></span>
       </nav>
       <a class="learning-module" href="#dashboard" aria-label="Open A2Z DSA learning module">
         <span class="module-mark">A2Z</span>
         <span><small>LEARN MODULE</small><b>A2Z DSA</b></span>
       </a>
-      <div class="nav-label">A2Z DSA</div>
-      <nav class="primary-nav" aria-label="A2Z DSA navigation">
+      <div class="nav-label" data-area-label="learn">A2Z DSA</div>
+      <nav class="primary-nav" data-area-nav="learn" aria-label="A2Z DSA navigation">
         <button class="nav-item active" data-page="dashboard"><span class="nav-icon">◫</span>Dashboard</button>
         <button class="nav-item" data-page="roadmap"><span class="nav-icon">⌘</span>Roadmap <span class="nav-count">20</span></button>
         <button class="nav-item" data-page="search"><span class="nav-icon">⌕</span>Search</button>
         <button class="nav-item" data-page="settings"><span class="nav-icon">⚙</span>Settings</button>
+        <button class="nav-item build-mobile-nav" data-build-nav><span class="nav-icon">▣</span>BUILD</button>
+      </nav>
+      <div class="nav-label" data-area-label="build" hidden>BUILD</div>
+      <nav class="primary-nav" data-area-nav="build" aria-label="BUILD navigation" hidden>
+        <button class="nav-item active" data-build-nav><span class="nav-icon">▣</span>Projects</button>
+        <button class="nav-item build-mobile-learn" data-area-switch="learn"><span class="nav-icon">‹</span>LEARN</button>
       </nav>
       <div class="sidebar-bottom">
         <div class="local-card"><span class="local-dot"></span><div><b>Saved on this device</b><small>Your progress stays private</small></div></div>
@@ -96,6 +103,9 @@
         <div class="module-list" id="roadmap-list"></div>
         <div class="roadmap-footnote"><span>ⓘ</span><span>Curriculum titles and section order come from the public TUF A2Z sheet. YouTube buttons link directly to URLs published with those lessons; entries without a verifiable direct video are labelled individually.</span></div>
       </section>
+      <section class="page build-page" id="build-page" aria-labelledby="build-heading">
+        <div id="build-app" aria-live="polite"><p class="build-message">Opening local project storage…</p></div>
+      </section>
       <footer class="page-footer"><span>MOHIT.OS · Learn · Build · Think</span><span>Progress is stored locally in your browser.</span></footer>
     </main>
   </div>
@@ -103,6 +113,7 @@
   <script src="curriculum.js?v=sync-20260930"></script>
   <script src="src/qr.js?v=pair-20261001"></script>
   <script src="src/app.js?v=mohit-os-20261002"></script>
-  <script type="module" src="src/foundation/bootstrap.mjs?v=foundation-20261003-2"></script>
+  <script type="module" src="src/foundation/bootstrap.mjs?v=foundation-20261003-5"></script>
+  <script type="module" src="src/build/app.mjs?v=build-20261003-5"></script>
 </body>
 </html>

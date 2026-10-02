@@ -1,6 +1,6 @@
 # MOHIT.OS — Developer Handover Context
 
-> Repository snapshot inspected on 2026-10-02. This file documents the checked-out code and deployment context; it contains no credentials. The only file created for this handover task is this document.
+> Initial repository snapshot inspected on 2026-10-02. Subsequent Foundation and BUILD V0 changes are described below. Always verify live Git/deployment state before acting; this file contains no credentials.
 
 ## Handover Instructions for the Next Coding Agent
 
@@ -10,25 +10,24 @@ Before changing anything, inspect the current branch and working tree, read this
 
 ## 1. Project Identity and Purpose
 
-MOHIT.OS is a personal learning and creation space. The first active product area is a static web application for tracking progress through Take U Forward’s A2Z DSA curriculum. It is a browser-first tracker with optional cloud sync, installable PWA metadata, and offline app-shell support.
+MOHIT.OS is a personal learning and creation space. LEARN is a static web application for tracking progress through Take U Forward’s A2Z DSA curriculum. BUILD V0 adds local-first project and task tracking on the separate Foundation IndexedDB repository. The A2Z tracker retains its optional cloud sync, installable PWA metadata, and offline app-shell support.
 
 ## 2. Branding and Hierarchy
 
 - Product: **MOHIT.OS**
 - Tagline: **Learn · Build · Think**
-- Current hierarchy: **MOHIT.OS → LEARN → A2Z DSA**
-- LEARN is active and contains the A2Z DSA tracker.
-- BUILD and THINK appear as static, subdued “SOON” navigation labels; neither has a functional area or dashboard.
+- Current hierarchy: **MOHIT.OS → LEARN → A2Z DSA** and **MOHIT.OS → BUILD → Projects (V0)**.
+- LEARN contains the existing A2Z DSA tracker; BUILD provides a local project/task tracker backed by Foundation storage.
+- THINK and the other future areas remain inactive.
 - Educational/source attribution to Take U Forward (TUF) and Striver is curriculum attribution, not the product name.
 
 The browser title is `MOHIT.OS · A2Z DSA`. The PWA manifest is named `MOHIT.OS · A2Z DSA`, with short name `MOHIT.OS`.
 
 ## 3. Repository and Git State
 
-- Git root: this project directory.
-- Branch at inspection: `main`, tracking `origin/main`.
-- HEAD at inspection: `8d603b7` — `feat: establish MOHIT.OS learn structure`.
-- Working tree was clean before this handover file was added. This documentation file is intentionally not committed or pushed by the handover task.
+- Git root: this project directory. Branch/HEAD details below describe the initial 2026-10-02 snapshot only; inspect live Git state before any commit, merge, or push.
+- Initial snapshot branch: `main`, tracking `origin/main`; HEAD was `8d603b7` — `feat: establish MOHIT.OS learn structure`.
+- The initial handover task left this documentation file uncommitted. Later changes may have moved it into history.
 - Remote: `https://github.com/MohitronAI/A2Z-DSA-tracker.git`.
 - Recent history includes the MOHIT.OS hierarchy change, PWA cache refresh for the prior rebrand, and the earlier A2Z DSA Tracker branding change. The repository history is preserved; no history rewrite is needed.
 
@@ -47,9 +46,13 @@ The browser title is `MOHIT.OS · A2Z DSA`. The PWA manifest is named `MOHIT.OS 
 ├── icons/                            # SVG and PNG PWA icons
 ├── src/
 │   ├── app.js                       # Dashboard, roadmap, progress, sync, pairing
-│   └── qr.js                        # Small in-app QR encoder; no QR dependency
+│   ├── qr.js                        # Small in-app QR encoder; no QR dependency
+│   ├── foundation/                  # Local IndexedDB repository and bootstrap
+│   └── build/app.mjs                # BUILD Projects UI
+├── styles-build.css                 # BUILD responsive styling
 ├── scripts/
-│   └── build.mjs                    # Copies static app into dist and writes config
+│   ├── build.mjs                    # Copies static app into dist and writes config
+│   └── validate.mjs                 # Dependency-free regression validator
 ├── supabase/
 │   ├── config.toml                  # Edge Function local configuration
 │   ├── migrations/                  # Progress merge and pairing schema/RPCs
@@ -124,6 +127,7 @@ When a lesson first changes, the app records its first-start time. Every checkbo
 - Build config is optional: without both public Supabase settings, the site remains local-only.
 - Browser storage is origin-scoped. `localhost`, a LAN IP, and each HTTPS hostname have separate localStorage. Switching origin does not itself transfer progress; pair devices through the same configured cloud tracker or use a backup.
 - Backup export/import handles progress records and merges imported progress; it is not an account or credential export.
+- MOHIT.OS Foundation uses a separate version-2 IndexedDB database for local ActivityEvents, Projects, Tasks, and device metadata. BUILD writes project/task events to that store. A2Z does not yet read from or write to Foundation storage.
 
 ## 10. Supabase Architecture and Sync Flow
 
@@ -200,7 +204,7 @@ The Edge Function reads the Supabase-provided server environment, including `SUP
 - `vercel.json`: framework unset (static site), build command `npm run build`, output `dist`, clean URLs enabled.
 - Local `.vercel/project.json` identifies the existing Vercel project as `striver-a2z-dsa-tracker`; this deployment identity was kept when MOHIT.OS branding was applied.
 - Deployment aliases verified in the 2026-10-02 project session: [https://mohit-os.vercel.app/](https://mohit-os.vercel.app/) and [https://striver-a2z-dsa-tracker-hazel.vercel.app/](https://striver-a2z-dsa-tracker-hazel.vercel.app/). The MOHIT.OS alias is the clean branded URL; the prior Vercel hostname remains assigned. Confirm live domains in Vercel before any future domain or project change.
-- The latest checked-in app commit was deployed and showed the MOHIT.OS title and hierarchy. Do not rename the Vercel project/domain or alter GitHub integration unless explicitly requested.
+- At the original 2026-10-02 snapshot, the latest checked-in app commit was deployed and showed the MOHIT.OS title and hierarchy. BUILD V0 is a subsequent local-only addition and must not be assumed deployed. Do not rename the Vercel project/domain or alter GitHub integration unless explicitly requested.
 
 ## 18. What Has Been Tested and Verified
 
@@ -209,10 +213,11 @@ Recorded checks in the current project session/history include:
 - `npm run build` completed successfully and produced the static `dist/` output.
 - Curriculum data was evaluated directly and counted as 20 modules, 84 sections, 495 lessons, and 324 non-null direct video URLs.
 - Browser smoke checks confirmed the MOHIT.OS title/brand, LEARN → A2Z DSA navigation, roadmap module totals, manifest metadata, and service-worker/offline status on the deployed app.
+- BUILD V0 browser smoke exercised project creation/editing, task scheduling/editing/completion, Next Action assignment, project history, reload persistence, desktop/mobile LEARN↔BUILD navigation, and a temporary A2Z lesson toggle with the original `striver-a2z-progress-v1` value restored exactly. The temporary Foundation smoke records were removed afterward.
 - Settings on production displayed connected/synced and available-offline status. A clean browser at the separate branded hostname initially showed 0/495 until it had progress locally or was paired; this is expected origin-scoped storage behavior.
-- The project has no automated regression test suite. The latest sync UI observations are not a substitute for a fresh two-device edit-and-round-trip test after sync/schema changes. The 324 YouTube URLs have not all been individually revalidated against YouTube availability.
+- `npm run validate` checks curriculum and Supabase allowlist invariants, progress contracts, strict timestamps/merge semantics, Foundation records/repository contracts, and BUILD project/task/Next Action contracts. It is not a browser end-to-end suite. The latest sync UI observations are not a substitute for a fresh two-device edit-and-round-trip test after sync/schema changes. The 324 YouTube URLs have not all been individually revalidated against YouTube availability.
 
-This handover task only inspects and documents; it does not rerun production deployment or modify app code.
+BUILD V0 is not deployed; this development change must be reviewed, committed, integrated, and pushed separately. No production deployment was performed for BUILD V0.
 
 ## 19. Known Limitations
 
@@ -225,7 +230,7 @@ This handover task only inspects and documents; it does not rerun production dep
 
 ## 20. Features Intentionally Not Implemented
 
-- BUILD and THINK applications or dashboards (only future “SOON” labels exist).
+- BUILD V0 has local project/task tracking and project history; cloud sync, reminders, and integrated PLAN/THINK workflows are not implemented. THINK remains inactive.
 - Day-by-day schedules, prerequisite locking, or curriculum gates.
 - A separate practice-problem completion area.
 - User registration/login or server-managed account recovery.
@@ -233,11 +238,11 @@ This handover task only inspects and documents; it does not rerun production dep
 
 ## 21. Current Unfinished Work
 
-No in-progress application branch or uncommitted feature change was present at inspection. The deployed A2Z tracker is implemented. The known content gap is the 171 lesson records without direct video URLs; a future curriculum audit should verify each against official/public TUF and official Take U Forward/Striver sources before adding a URL. There is no test suite yet, so future changes currently rely on build and manual browser checks.
+The deployed A2Z tracker and the MOHIT.OS Foundation are implemented; BUILD V0 adds local-only Projects and Tasks without changing A2Z progress or Supabase contracts. BUILD data is isolated to Foundation IndexedDB and is currently browser-origin scoped. The known content gap is the 171 lesson records without direct video URLs; a future curriculum audit should verify each against official/public TUF and official Take U Forward/Striver sources before adding a URL.
 
 ## 22. Recommended Next Development Step
 
-Add a small, non-invasive validation/regression layer before expanding features: assert the 20/84/495 curriculum totals, unique stable IDs, alignment with the Edge Function allowlist, and required progress record/timestamp behavior. Then continue a source-backed audit of the 171 missing direct video URLs and add only individually verified links. Preserve all existing lesson IDs and sync data while doing so.
+Continue BUILD carefully with focused usability/regression improvements before adding cloud sync or reminders. Keep the new BUILD domain local-first and separate from A2Z; evaluate cross-device synchronization as a separately designed change with explicit versioning and conflict contracts.
 
 ## 23. Architectural Decisions to Preserve
 
@@ -246,7 +251,7 @@ Add a small, non-invasive validation/regression layer before expanding features:
 - Device pairing through short-lived, single-use code/QR and opaque hashed credentials; no user account system.
 - Curriculum is the source of module/section/lesson IDs; the server has a matching lesson-ID allowlist.
 - PWA shell caching and localStorage-based offline progress.
-- Current product hierarchy and minimal future-area labels.
+- Existing LEARN → A2Z experience and the local-only BUILD V0 boundary.
 
 ## 24. Things a Future Agent Must Not Break or Unnecessarily Rewrite
 
@@ -256,5 +261,5 @@ Add a small, non-invasive validation/regression layer before expanding features:
 - Do not break pairing token/code format, expiration, single-use behavior, device credential hashing, or QR target handling without an end-to-end replacement.
 - Do not remove the service-worker’s legacy cache cleanup prefix or forget to bump/update precached asset URLs when changing cached app assets.
 - Do not replace the 20-module curriculum, discard missing-link lessons, or fabricate video URLs to make all buttons appear populated.
-- Do not redesign the familiar A2Z dashboard/roadmap, introduce schedule/locking/practice tracking, or activate BUILD/THINK unless the task explicitly requests it.
+- Do not redesign the familiar A2Z dashboard/roadmap or introduce schedule/locking/practice tracking. BUILD V0 is explicitly active; do not activate THINK or other future areas unless requested.
 - Do not rename the GitHub repository or alter the existing production project/domains as part of unrelated work.

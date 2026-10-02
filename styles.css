@@ -41,7 +41,7 @@
 
 /* MOHIT.OS → LEARN → A2Z DSA navigation */
 .os-areas{display:flex;gap:5px;margin:0 5px 15px}
-.os-area{min-height:28px;display:flex;align-items:center;gap:5px;padding:0 8px;border:1px solid #e8edf5;border-radius:7px;color:#8290a2;font-size:9px;font-weight:800;letter-spacing:.45px}
+.os-area{min-height:28px;display:flex;align-items:center;gap:5px;padding:0 8px;border:1px solid #e8edf5;border-radius:7px;color:#8290a2;font-family:inherit;font-size:9px;font-weight:800;letter-spacing:.45px;cursor:pointer}
 .os-area.active{border-color:#dce6ff;background:#f1f5ff;color:#4167c9}
 .os-area.future{color:#a2adbb}
 .os-area small{padding:2px 4px;border-radius:4px;background:#f1f3f6;color:#9aa5b3;font-size:6px;letter-spacing:.25px}

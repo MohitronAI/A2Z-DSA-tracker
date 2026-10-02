@@ -27,7 +27,7 @@ if (publishableKey && !publishableKey.startsWith('sb_publishable_')) {
 }
 
 await mkdir(out, { recursive: true });
-for (const name of ['index.html', 'styles.css', 'curriculum.js', 'manifest.webmanifest', 'service-worker.js', 'src', 'icons']) {
+for (const name of ['index.html', 'styles.css', 'styles-build.css', 'curriculum.js', 'manifest.webmanifest', 'service-worker.js', 'src', 'icons']) {
   await cp(path.join(root, name), path.join(out, name), { recursive: true });
 }
 await writeFile(path.join(out, 'config.js'), `window.STRIVER_CONFIG = ${JSON.stringify({ supabaseUrl, supabaseAnonKey: publishableKey })};\n`);

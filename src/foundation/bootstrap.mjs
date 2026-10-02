@@ -1,4 +1,4 @@
-import { createFoundationRepository } from './repository.mjs?v=foundation-20261003-2';
+import { createFoundationRepository } from './repository.mjs?v=foundation-20261003-5';
 
 const foundationRepository = createFoundationRepository();
 

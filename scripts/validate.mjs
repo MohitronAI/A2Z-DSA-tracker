@@ -6,8 +6,14 @@ import {
   ACTIVITY_EVENT_SCHEMA_VERSION,
   FOUNDATION_DATABASE_NAME,
   FOUNDATION_DATABASE_VERSION,
+  PROJECT_STORE_NAME,
+  TASK_STORE_NAME,
+  buildRepositoryContract,
   createFoundationRepository,
   matchesActivityQuery,
+  projectTaskRelationshipValid,
+  validateProjectRecord,
+  validateTaskRecord,
   validateActivityEvent
 } from '../src/foundation/repository.mjs';
 
@@ -247,7 +253,7 @@ await recordCheck('sync merge contract', () => {
 
 await recordCheck('MOHIT.OS Foundation schema and ActivityEvent contract', () => {
   assert(FOUNDATION_DATABASE_NAME === 'mohit-os-foundation', `Unexpected Foundation database name: ${FOUNDATION_DATABASE_NAME}`);
-  assert(FOUNDATION_DATABASE_VERSION === 1, `Expected Foundation database version 1, found ${FOUNDATION_DATABASE_VERSION}`);
+  assert(FOUNDATION_DATABASE_VERSION === 2, `Expected Foundation database version 2, found ${FOUNDATION_DATABASE_VERSION}`);
   assert(ACTIVITY_EVENT_SCHEMA_VERSION === 1, `Expected ActivityEvent schema version 1, found ${ACTIVITY_EVENT_SCHEMA_VERSION}`);
 
   const event = validateActivityEvent({
@@ -309,6 +315,74 @@ await recordCheck('MOHIT.OS Foundation schema and ActivityEvent contract', () =>
     () => { throw new Error('Repository initialization should reject when IndexedDB is unavailable'); },
     error => assert(error instanceof Error && error.message.includes('IndexedDB is unavailable'), 'Unavailable storage should reject with a clear error')
   );
+});
+
+await recordCheck('BUILD V0 record and repository contracts', () => {
+  assert(FOUNDATION_DATABASE_VERSION === 2, `Expected Foundation database version 2, found ${FOUNDATION_DATABASE_VERSION}`);
+  assert(PROJECT_STORE_NAME === 'projects', `Unexpected Project store: ${PROJECT_STORE_NAME}`);
+  assert(TASK_STORE_NAME === 'tasks', `Unexpected Task store: ${TASK_STORE_NAME}`);
+  const repository = createFoundationRepository({ indexedDB: null });
+  assert(buildRepositoryContract(repository).length === 0, `BUILD repository is missing methods: ${buildRepositoryContract(repository).join(', ')}`);
+
+  const timestamp = '2026-10-02T10:00:00.000Z';
+  const project = validateProjectRecord({
+    projectId: 'project-check',
+    name: 'Validation project',
+    status: 'active',
+    importance: 'high',
+    currentState: 'Designing the first step',
+    nextActionId: 'task-check',
+    blockers: ['Waiting for test device'],
+    lastActivityAt: timestamp,
+    nextReviewAt: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    archivedAt: null
+  });
+  const task = validateTaskRecord({
+    taskId: 'task-check',
+    title: 'Test task',
+    status: 'in_progress',
+    priority: 'medium',
+    projectId: 'project-check',
+    dueAt: null,
+    scheduledAt: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    completedAt: null
+  });
+  assert(projectTaskRelationshipValid(project, task), 'Next Action relationship should accept an existing task belonging to its project');
+  assert(!projectTaskRelationshipValid(project, { ...task, projectId: 'another-project' }), 'Next Action relationship should reject a task from another project');
+
+  const invalidProject = { ...project, status: 'in-progress' };
+  let projectRejected = false;
+  try { validateProjectRecord(invalidProject); } catch { projectRejected = true; }
+  assert(projectRejected, 'Invalid project status should be rejected');
+
+  const validProjectStatuses = ['active', 'paused', 'completed', 'archived']
+    .every(status => validateProjectRecord({ ...project, status }).status === status);
+  assert(validProjectStatuses, 'Every supported project status should be accepted');
+  const validImportanceValues = ['low', 'medium', 'high']
+    .every(importance => validateProjectRecord({ ...project, importance }).importance === importance);
+  assert(validImportanceValues, 'Every supported project importance should be accepted');
+
+  let taskRejected = false;
+  try { validateTaskRecord({ ...task, status: 'stalled' }); } catch { taskRejected = true; }
+  assert(taskRejected, 'Invalid task status should be rejected');
+  const validTaskStatuses = ['todo', 'in_progress', 'completed', 'cancelled']
+    .every(status => validateTaskRecord({
+      ...task,
+      status,
+      completedAt: status === 'completed' ? timestamp : null
+    }).status === status);
+  assert(validTaskStatuses, 'Every supported task status should be accepted');
+  const validPriorities = ['low', 'medium', 'high']
+    .every(priority => validateTaskRecord({ ...task, priority }).priority === priority);
+  assert(validPriorities, 'Every supported task priority should be accepted');
+
+  let completionTimestampRejected = false;
+  try { validateTaskRecord({ ...task, status: 'completed' }); } catch { completionTimestampRejected = true; }
+  assert(completionTimestampRejected, 'Completed task without completedAt should be rejected');
 });
 
 if (failures.length > 0) {

@@ -26,7 +26,9 @@ Current hierarchy:
 
 `MOHIT.OS → LEARN → A2Z DSA`
 
-LEARN is currently the only active product area. BUILD and THINK are future areas and must remain inactive until implemented.
+`MOHIT.OS → BUILD → Projects (V0)`
+
+LEARN contains the existing A2Z tracker. BUILD V0 provides local-only project/task tracking and activity history. THINK and the remaining areas are future areas and must remain inactive until implemented.
 
 ## 3. CURRENT STATE
 
@@ -39,6 +41,8 @@ It is an existing A2Z DSA tracker with curriculum tracking, lesson completion, p
 The existing A2Z DSA functionality must continue working while MOHIT.OS expands.
 
 Do not rebuild the A2Z tracker from scratch or replace working architecture without a specific reason.
+
+The MOHIT.OS Foundation is a separate local IndexedDB repository. BUILD V0 uses it for Projects, Tasks, and project ActivityEvents; A2Z progress has not been migrated or connected to it.
 
 ## 4. Product Direction
 
@@ -243,6 +247,7 @@ Existing A2Z DSA functionality remains active.
 - Reminders
 
 ### V3 — BUILD
+Initial local-only BUILD V0 implemented: project/task tracking and project history. Further BUILD work should remain incremental.
 - Projects
 - Project status
 - Current work
