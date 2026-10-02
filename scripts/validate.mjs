@@ -2,6 +2,14 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import {
+  ACTIVITY_EVENT_SCHEMA_VERSION,
+  FOUNDATION_DATABASE_NAME,
+  FOUNDATION_DATABASE_VERSION,
+  createFoundationRepository,
+  matchesActivityQuery,
+  validateActivityEvent
+} from '../src/foundation/repository.mjs';
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url));
 const curriculumPath = path.join(rootDir, 'curriculum.js');
@@ -235,6 +243,72 @@ await recordCheck('sync merge contract', () => {
   const mergedEqual = mergeProgress({ lessonB: equalA }, { lessonB: equalB });
   assert(mergedEqual.lessonB.revisionId === 'zzz', 'Equal timestamps must break by revisionId deterministically');
   assert(compareEntries(equalB, equalA) > 0, 'compareEntries should prefer the lexicographically larger revisionId on equal timestamps');
+});
+
+await recordCheck('MOHIT.OS Foundation schema and ActivityEvent contract', () => {
+  assert(FOUNDATION_DATABASE_NAME === 'mohit-os-foundation', `Unexpected Foundation database name: ${FOUNDATION_DATABASE_NAME}`);
+  assert(FOUNDATION_DATABASE_VERSION === 1, `Expected Foundation database version 1, found ${FOUNDATION_DATABASE_VERSION}`);
+  assert(ACTIVITY_EVENT_SCHEMA_VERSION === 1, `Expected ActivityEvent schema version 1, found ${ACTIVITY_EVENT_SCHEMA_VERSION}`);
+
+  const event = validateActivityEvent({
+    eventId: 'event-validation-1',
+    schemaVersion: 1,
+    type: 'task.created',
+    occurredAt: '2026-10-02T10:00:00.000Z',
+    recordedAt: '2026-10-02T10:00:01.000Z',
+    deviceId: 'device-validation-1',
+    sourceModule: 'plan.tasks',
+    subject: { type: 'task', id: 'task-1' },
+    relatedEntities: [{ type: 'project', id: 'project-1' }],
+    payload: { title: 'Review architecture' },
+    correlationId: 'correlation-1'
+  });
+  assert(event.eventId === 'event-validation-1', 'Event ID was not preserved');
+  assert(event.subject.type === 'task' && event.subject.id === 'task-1', 'Subject reference was not preserved');
+  assert(event.relatedEntities.length === 1, 'Related entities were not preserved');
+  assert(event.schemaVersion === ACTIVITY_EVENT_SCHEMA_VERSION, 'Event schema version mismatch');
+
+  let invalidEventRejected = false;
+  try {
+    validateActivityEvent({ ...event, occurredAt: 'not-a-timestamp' });
+  } catch {
+    invalidEventRejected = true;
+  }
+  assert(invalidEventRejected, 'Invalid event timestamp should be rejected');
+
+  const invalidTimestamps = [
+    '2026-02-30T10:00:00Z',
+    '2026-13-01T10:00:00Z',
+    '2026-04-31T10:00:00Z',
+    '2026-01-01 10:00:00Z',
+    '2026-01-01T10:00:00+24:00'
+  ];
+  for (const timestamp of invalidTimestamps) {
+    let rejected = false;
+    try {
+      validateActivityEvent({ ...event, occurredAt: timestamp });
+    } catch {
+      rejected = true;
+    }
+    assert(rejected, `Malformed or impossible timestamp should be rejected: ${timestamp}`);
+  }
+
+  const validTimestamp = validateActivityEvent({ ...event, occurredAt: '2026-10-02T10:00:00-04:00' });
+  assert(validTimestamp.occurredAt === '2026-10-02T14:00:00.000Z', 'Valid offset timestamp should normalize to UTC');
+
+  assert(matchesActivityQuery(event, {
+    from: '2026-10-02T09:59:00.000Z',
+    to: '2026-10-02T10:01:00.000Z',
+    sourceModule: 'plan.tasks',
+    subject: { type: 'task', id: 'task-1' }
+  }), 'Matching time/source/subject query should include the event');
+  assert(!matchesActivityQuery(event, { sourceModule: 'learn.a2z-dsa' }), 'Non-matching source query should exclude the event');
+
+  const unavailableRepository = createFoundationRepository({ indexedDB: null });
+  return unavailableRepository.open().then(
+    () => { throw new Error('Repository initialization should reject when IndexedDB is unavailable'); },
+    error => assert(error instanceof Error && error.message.includes('IndexedDB is unavailable'), 'Unavailable storage should reject with a clear error')
+  );
 });
 
 if (failures.length > 0) {

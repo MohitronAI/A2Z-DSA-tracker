@@ -16,6 +16,14 @@ MOHIT.OS is a personal learning and creation space. Its first active area is **L
 
 The roadmap has no day schedule, prerequisite locking, or separate practice-problem tracker. Video links point directly to YouTube; lessons without a verified direct video remain individually marked in the app.
 
+## MOHIT.OS Foundation storage
+
+The app initializes a separate, local-only IndexedDB database named `mohit-os-foundation` (database version 1). Its initial `activityEvents` object store uses `eventId` as its key and indexes `occurredAt`, `sourceModule`, and the compound subject type/ID. The A2Z tracker does not read from or write to this database.
+
+The browser module `src/foundation/repository.mjs` exports `createFoundationRepository()`, which provides `open()`, `appendEvent(event)`, `getEvent(eventId)`, `queryEvents(options)`, and `close()`. `open()` initializes storage and returns database name/version metadata without exposing the raw IndexedDB connection. `appendEvent` is append-only and first-write-wins for duplicate event IDs; query results are ordered by occurrence time, recorded time, then event ID. Storage initialization failures are reported in the console and do not block the existing tracker.
+
+Activity events use schema version 1 and record an event ID/type, occurrence and recording timestamps, device ID, source module, a typed subject reference, related entity references, and a JSON payload; `correlationId` is optional. This foundation is not yet connected to A2Z progress, cloud sync, authentication, or notifications.
+
 ## Progress and privacy
 
 Progress and device credentials are stored in each browser’s `localStorage`. When cloud sync is configured, the app sends progress through the `progress-sync` Supabase Edge Function. Device credentials and pairing codes are stored server-side as hashes. Database tables deny direct anonymous access with RLS; the Edge Function uses its server-side Supabase credentials. Do not put a Supabase secret key, service-role key, CLI access token, or database password in browser files or frontend environment variables.
